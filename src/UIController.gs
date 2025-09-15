@@ -175,11 +175,12 @@ function getCharacterDetails(characterId) {
     // 関連情報を追加
     var details = {
       character: character,
-      similarCharacters: getSimilarCharacters(character),
-      priorityHistory: getPriorityHistory(character.rowIndex),
-      recommendations: getRecommendations(character)
+      similarCharacters: getSimilarCharacters(character) || [],
+      priorityHistory: getPriorityHistory(character.rowIndex) || [],
+      recommendations: getRecommendations(character) || []
     };
     
+    Logger.log('キャラクター詳細取得成功: ' + character.name + ' (ID: ' + character.id + ')');
     return details;
     
   } catch (error) {

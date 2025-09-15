@@ -555,21 +555,46 @@ let isUpdatingOwnership = false;
 function showCharacterModal(characterId) {
   console.log('モーダル表示要求:', characterId);
   
+  // 入力値検証
+  if (!characterId) {
+    console.error('キャラクターIDが空です');
+    alert('キャラクターIDが指定されていません');
+    return;
+  }
+  
   google.script.run
     .withSuccessHandler(function(details) {
       console.log('キャラクター詳細取得成功:', details);
-      renderCharacterModal(details);
+      try {
+        renderCharacterModal(details);
+      } catch (error) {
+        console.error('モーダル描画エラー:', error);
+        alert('モーダルの表示に失敗しました: ' + error.message);
+      }
     })
     .withFailureHandler(function(error) {
       console.error('キャラクター詳細取得エラー:', error);
-      alert('キャラクター詳細の取得に失敗しました: ' + error.message);
+      alert('キャラクター詳細の取得に失敗しました: ' + (error.message || error.toString()));
     })
     .getCharacterDetails(String(characterId)); // 文字列として送信
 }
 
 function renderCharacterModal(details) {
+  // エラーハンドリング: detailsオブジェクトの検証
+  if (!details) {
+    console.error('キャラクター詳細データが空です');
+    alert('キャラクター詳細データの取得に失敗しました');
+    return;
+  }
+  
+  if (!details.character) {
+    console.error('キャラクターデータが空です:', details);
+    alert('キャラクターデータが見つかりません');
+    return;
+  }
+  
   const character = details.character;
-  const similar = details.similarCharacters;
+  const similar = details.similarCharacters || [];
   currentModalCharacter = character;
   
   const modalHtml = `
@@ -609,15 +634,18 @@ function renderCharacterModal(details) {
           </div>
         </div>
         
-        ${similar.length > 0 ? `
+        ${similar && similar.length > 0 ? `
           <div class="similar-characters">
             <h4>類似キャラクター</h4>
-            ${similar.map(item => `
-              <div class="similar-character-item">
-                <span>${escapeHtml(item.character.name)} (${escapeHtml(item.character.attribute)})</span>
-                <span class="similarity-score">類似度: ${item.similarity}</span>
-              </div>
-            `).join('')}
+            ${similar.map(item => {
+              if (!item || !item.character) return '';
+              return `
+                <div class="similar-character-item">
+                  <span>${escapeHtml(item.character.name || '不明')} (${escapeHtml(item.character.attribute || '不明')})</span>
+                  <span class="similarity-score">類似度: ${item.similarity || 0}</span>
+                </div>
+              `;
+            }).join('')}
           </div>
         ` : ''}
       </div>

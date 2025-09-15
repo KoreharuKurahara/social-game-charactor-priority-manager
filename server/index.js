@@ -33,7 +33,7 @@ app.get('/', (req, res) => {
   // index.htmlを読み込んでローカル用に変換
   const indexPath = path.join(__dirname, '../src/index.html');
   let html = fs.readFileSync(indexPath, 'utf8');
-  
+
   // Google Apps Script用のinclude文をローカル用に変換
   html = html.replace(/<\?!= include\('([^']+)'\); \?>/g, (match, filename) => {
     const filePath = path.join(__dirname, `../src/${filename}.html`);
@@ -47,19 +47,19 @@ app.get('/', (req, res) => {
       return '';
     }
   });
-  
+
   // 開発用バナーを追加
   html = html.replace('<body>', `<body>
     <div class="dev-banner">
       ローカル開発モード - ポート${PORT} - モックデータ使用中
     </div>`);
-  
+
   // 代替CSSリンクを追加（includeが失敗した場合の備え）
   html = html.replace('</head>', `
     <link rel="stylesheet" href="/static/css/styles.css">
     </head>
   `);
-  
+
   // ローカル開発用のスクリプトを追加
   html = html.replace('</body>', `
     <script>
@@ -72,7 +72,7 @@ app.get('/', (req, res) => {
     <script src="/static/js/local-dev.js"></script>
     </body>
   `);
-  
+
   res.send(html);
 });
 
@@ -98,7 +98,7 @@ app.get('/api/characters', (req, res) => {
   console.log('👥 キャラクター取得API呼び出し', req.query);
   try {
     const options = req.query;
-    
+
     // 特殊なクエリパラメータの処理
     if (options.priority === 'high') {
       // 高優先度キャラクター
@@ -191,13 +191,13 @@ app.get('/api/dev/test-data', (req, res) => {
   try {
     console.log('mockData object:', typeof mockData);
     console.log('mockData.getStatistics:', typeof mockData.getStatistics);
-    
+
     const stats = mockData.getStatistics();
     console.log('stats result:', stats);
-    
+
     const characters = mockData.getUnownedCharactersWithOptions({});
     console.log('characters result:', characters ? characters.length : 'null');
-    
+
     res.json({
       stats: stats,
       characterCount: characters.length,
