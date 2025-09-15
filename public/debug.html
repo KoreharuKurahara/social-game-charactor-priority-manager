@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>デバッグページ - けものフレンズ3 優先度管理</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+    .btn { background: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 3px; cursor: pointer; margin: 5px; }
+    .result { margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 3px; white-space: pre-wrap; }
+    .success { background: #d4edda; color: #155724; }
+    .error { background: #f8d7da; color: #721c24; }
+  </style>
+</head>
+<body>
+  <h1>🔧 ローカル開発デバッグページ</h1>
+  
+  <div class="test-section">
+    <h3>📡 API接続テスト</h3>
+    <button class="btn" onclick="testAPI('/api/statistics', 'stats')">統計情報</button>
+    <button class="btn" onclick="testAPI('/api/characters', 'characters')">キャラクター</button>
+    <button class="btn" onclick="testAPI('/api/dashboard', 'dashboard')">ダッシュボード</button>
+    <button class="btn" onclick="testAPI('/api/dev/test-data', 'testData')">テストデータ</button>
+    <div id="apiResult" class="result"></div>
+  </div>
+  
+  <div class="test-section">
+    <h3>🧪 モックデータテスト</h3>
+    <button class="btn" onclick="testMockData()">モックデータ確認</button>
+    <button class="btn" onclick="reloadMock()">モックデータリロード</button>
+    <div id="mockResult" class="result"></div>
+  </div>
+  
+  <div class="test-section">
+    <h3>🎯 フィルタテスト</h3>
+    <button class="btn" onclick="testFilter('attribute', 'アクティブ')">アクティブ属性</button>
+    <button class="btn" onclick="testFilter('shopType', 'special')">スペシャルショップ</button>
+    <button class="btn" onclick="testFilter('priorityStatus', 'unset')">優先度未設定</button>
+    <div id="filterResult" class="result"></div>
+  </div>
+
+  <script>
+    const API_BASE = 'http://localhost:3000';
+    
+    async function testAPI(endpoint, resultId) {
+      const resultDiv = document.getElementById('apiResult');
+      resultDiv.textContent = '⏳ テスト中...';
+      
+      try {
+        const response = await fetch(API_BASE + endpoint);
+        const data = await response.json();
+        
+        resultDiv.className = 'result success';
+        resultDiv.textContent = `✅ ${endpoint} 成功:\n${JSON.stringify(data, null, 2)}`;
+      } catch (error) {
+        resultDiv.className = 'result error';
+        resultDiv.textContent = `❌ ${endpoint} エラー:\n${error.message}`;
+      }
+    }
+    
+    async function testMockData() {
+      const resultDiv = document.getElementById('mockResult');
+      resultDiv.textContent = '⏳ テスト中...';
+      
+      try {
+        const response = await fetch(API_BASE + '/api/dev/test-data');
+        const data = await response.json();
+        
+        resultDiv.className = 'result success';
+        resultDiv.textContent = `✅ モックデータ確認成功:
+統計: 総数${data.stats.total}, 未所持${data.stats.unowned}
+キャラクター数: ${data.characterCount}
+サンプル: ${data.sampleCharacters.map(c => c.name).join(', ')}`;
+      } catch (error) {
+        resultDiv.className = 'result error';
+        resultDiv.textContent = `❌ モックデータエラー:\n${error.message}`;
+      }
+    }
+    
+    async function reloadMock() {
+      try {
+        const response = await fetch(API_BASE + '/api/dev/reload-mock');
+        const data = await response.json();
+        
+        document.getElementById('mockResult').className = 'result success';
+        document.getElementById('mockResult').textContent = `✅ ${data.message}`;
+      } catch (error) {
+        document.getElementById('mockResult').className = 'result error';
+        document.getElementById('mockResult').textContent = `❌ リロードエラー: ${error.message}`;
+      }
+    }
+    
+    async function testFilter(filterType, filterValue) {
+      const resultDiv = document.getElementById('filterResult');
+      resultDiv.textContent = '⏳ フィルタテスト中...';
+      
+      try {
+        const params = new URLSearchParams();
+        params.set(filterType, filterValue);
+        
+        const response = await fetch(`${API_BASE}/api/characters?${params}`);
+        const data = await response.json();
+        
+        resultDiv.className = 'result success';
+        resultDiv.textContent = `✅ フィルタ ${filterType}=${filterValue} 成功:
+結果: ${data.length}体
+例: ${data.slice(0, 3).map(c => `${c.name}(${c.attribute})`).join(', ')}`;
+      } catch (error) {
+        resultDiv.className = 'result error';
+        resultDiv.textContent = `❌ フィルタエラー: ${error.message}`;
+      }
+    }
+  </script>
+</body>
+</html>

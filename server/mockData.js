@@ -121,7 +121,7 @@ let mockCharacters = [
 for (let i = 11; i <= 50; i++) {
   const attributes = ['アクティブ', 'ラブリー', 'フレンドリー', 'リラックス', 'マイペース'];
   const names = ['テストキャラ', 'サンプル', 'ダミー', 'モック', 'デモ'];
-  
+
   mockCharacters.push({
     rowIndex: i + 1,
     id: String(i).padStart(3, '0'),
@@ -143,13 +143,13 @@ function getStatistics() {
   const owned = mockCharacters.filter(c => c.owned).length;
   const unowned = total - owned;
   const prioritySet = mockCharacters.filter(c => !c.owned && c.priority !== null).length;
-  
+
   // 属性別統計
   const attributes = {};
   mockCharacters.filter(c => !c.owned).forEach(c => {
     attributes[c.attribute] = (attributes[c.attribute] || 0) + 1;
   });
-  
+
   // ショップ別統計
   const unownedChars = mockCharacters.filter(c => !c.owned);
   const shops = {
@@ -158,7 +158,7 @@ function getStatistics() {
     both: unownedChars.filter(c => c.specialShop && c.greatShop).length,
     neither: unownedChars.filter(c => !c.specialShop && !c.greatShop).length
   };
-  
+
   return {
     total,
     owned,
@@ -183,12 +183,12 @@ function getStatistics() {
  */
 function getUnownedCharactersWithOptions(options = {}) {
   let characters = mockCharacters.filter(c => !c.owned);
-  
+
   // 属性フィルタ
   if (options.attribute) {
     characters = characters.filter(c => c.attribute === options.attribute);
   }
-  
+
   // ショップフィルタ
   if (options.shopType) {
     switch (options.shopType) {
@@ -209,7 +209,7 @@ function getUnownedCharactersWithOptions(options = {}) {
         break;
     }
   }
-  
+
   // 優先度フィルタ
   if (options.priorityStatus) {
     if (options.priorityStatus === 'set') {
@@ -218,13 +218,13 @@ function getUnownedCharactersWithOptions(options = {}) {
       characters = characters.filter(c => c.priority === null);
     }
   }
-  
+
   // 検索フィルタ
   if (options.search) {
     const searchTerm = options.search.toLowerCase();
     characters = characters.filter(c => c.name.toLowerCase().includes(searchTerm));
   }
-  
+
   return characters;
 }
 
@@ -236,13 +236,13 @@ function getCharactersWithPagination(options = {}) {
   const pageSize = parseInt(options.pageSize) || 20;
   const sortBy = options.sortBy || 'priority';
   const sortOrder = options.sortOrder || 'desc';
-  
+
   let characters = getUnownedCharactersWithOptions(options);
-  
+
   // ソート
   characters.sort((a, b) => {
     let aValue, bValue;
-    
+
     switch (sortBy) {
       case 'priority':
         aValue = a.priority === null ? 0 : a.priority;
@@ -264,21 +264,21 @@ function getCharactersWithPagination(options = {}) {
         aValue = a.priority === null ? 0 : a.priority;
         bValue = b.priority === null ? 0 : b.priority;
     }
-    
+
     if (sortOrder === 'asc') {
       return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
     } else {
       return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
     }
   });
-  
+
   // ページネーション
   const totalCount = characters.length;
   const totalPages = Math.ceil(totalCount / pageSize);
   const startIndex = (page - 1) * pageSize;
   const endIndex = Math.min(startIndex + pageSize, totalCount);
   const pageCharacters = characters.slice(startIndex, endIndex);
-  
+
   return {
     characters: pageCharacters,
     pagination: {
@@ -310,7 +310,7 @@ function getCharacterDetails(characterId) {
   if (!character) {
     throw new Error('キャラクターが見つかりません');
   }
-  
+
   // 類似キャラクター（同じ属性）
   const similarCharacters = mockCharacters
     .filter(c => c.id !== characterId && c.attribute === character.attribute && !c.owned)
@@ -319,7 +319,7 @@ function getCharacterDetails(characterId) {
       character: c,
       similarity: 3 // 簡易版
     }));
-  
+
   return {
     character,
     similarCharacters,
@@ -349,7 +349,7 @@ function getDashboardData() {
     .filter(c => !c.owned && c.priority >= 8)
     .sort((a, b) => b.priority - a.priority)
     .slice(0, 5);
-  
+
   return {
     overview: {
       totalCharacters: stats.total,
@@ -395,10 +395,10 @@ function updatePriority(rowIndex, priority) {
   if (!character) {
     throw new Error('キャラクターが見つかりません');
   }
-  
+
   character.priority = priority;
   console.log(`✅ 優先度更新: ${character.name} → ${priority}`);
-  
+
   return { success: true };
 }
 

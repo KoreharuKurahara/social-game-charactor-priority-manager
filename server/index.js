@@ -65,7 +65,7 @@ app.get('/', (req, res) => {
     <script>
       // ローカル開発環境フラグ
       window.IS_LOCAL_DEV = true;
-      window.API_BASE_URL = 'http://localhost:${PORT}/api';
+      window.API_BASE_URL = 'http://localhost:${PORT}';
       console.log('🔧 ローカル開発モード起動');
       console.log('📡 API Base URL:', window.API_BASE_URL);
     </script>
@@ -76,16 +76,48 @@ app.get('/', (req, res) => {
   res.send(html);
 });
 
+// デバッグページ
+app.get('/debug', (req, res) => {
+  const debugPath = path.join(__dirname, '../public/debug.html');
+  res.sendFile(debugPath);
+});
+
 // API エンドポイント
 app.get('/api/statistics', (req, res) => {
   console.log('📊 統計情報API呼び出し');
-  res.json(mockData.getStatistics());
+  try {
+    const stats = mockData.getStatistics();
+    res.json(stats);
+  } catch (error) {
+    console.error('❌ 統計情報エラー:', error);
+    res.status(500).json({ error: 'Internal Server Error', message: error.message });
+  }
 });
 
 app.get('/api/characters', (req, res) => {
   console.log('👥 キャラクター取得API呼び出し', req.query);
-  const options = req.query;
-  res.json(mockData.getUnownedCharactersWithOptions(options));
+  try {
+    const options = req.query;
+    
+    // 特殊なクエリパラメータの処理
+    if (options.priority === 'high') {
+      // 高優先度キャラクター
+      const characters = mockData.getUnownedCharactersWithOptions({});
+      const highPriority = characters.filter(c => c.priority >= 8);
+      res.json(highPriority);
+    } else if (options.priority === 'unset') {
+      // 優先度未設定キャラクター
+      const characters = mockData.getUnownedCharactersWithOptions({});
+      const unset = characters.filter(c => c.priority === null);
+      res.json(unset);
+    } else {
+      const result = mockData.getUnownedCharactersWithOptions(options);
+      res.json(result);
+    }
+  } catch (error) {
+    console.error('❌ キャラクター取得エラー:', error);
+    res.status(500).json({ error: 'Internal Server Error', message: error.message });
+  }
 });
 
 app.get('/api/characters/paginated', (req, res) => {
@@ -124,6 +156,30 @@ app.get('/api/dev/reload-mock', (req, res) => {
   console.log('🔄 モックデータリロード');
   delete require.cache[require.resolve('./mockData')];
   res.json({ success: true, message: 'モックデータをリロードしました' });
+});
+
+app.get('/api/dev/test-data', (req, res) => {
+  console.log('🧪 テストデータ確認');
+  try {
+    console.log('mockData object:', typeof mockData);
+    console.log('mockData.getStatistics:', typeof mockData.getStatistics);
+    
+    const stats = mockData.getStatistics();
+    console.log('stats result:', stats);
+    
+    const characters = mockData.getUnownedCharactersWithOptions({});
+    console.log('characters result:', characters ? characters.length : 'null');
+    
+    res.json({
+      stats: stats,
+      characterCount: characters.length,
+      sampleCharacters: characters.slice(0, 3),
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ テストデータエラー:', error);
+    res.status(500).json({ error: 'Internal Server Error', message: error.message, stack: error.stack });
+  }
 });
 
 app.get('/api/dev/status', (req, res) => {
