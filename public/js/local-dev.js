@@ -72,6 +72,33 @@ if (window.IS_LOCAL_DEV) {
         })
           .then(successCallback)
           .catch(failureCallback);
+      },
+
+      // 所持ステータス更新
+      updateOwnershipStatus: function (rowIndex, isOwned) {
+        fetchAPI(`/api/characters/${rowIndex}/ownership`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ isOwned })
+        })
+          .then(successCallback)
+          .catch(failureCallback);
+      },
+
+      // 全キャラクター取得
+      getAllCharacters: function () {
+        fetchAPI('/api/characters/all')
+          .then(successCallback)
+          .catch(failureCallback);
+      },
+
+      // 未所持キャラクター取得
+      getUnownedCharacters: function () {
+        fetchAPI('/api/characters/unowned')
+          .then(successCallback)
+          .catch(failureCallback);
       }
     };
   }

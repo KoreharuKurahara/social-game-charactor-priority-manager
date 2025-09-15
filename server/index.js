@@ -151,6 +151,34 @@ app.put('/api/characters/:rowIndex/priority', (req, res) => {
   res.json(result);
 });
 
+app.put('/api/characters/:rowIndex/ownership', (req, res) => {
+  console.log('👤 所持ステータス更新API呼び出し', req.params.rowIndex, req.body.isOwned);
+  const result = mockData.updateOwnershipStatus(parseInt(req.params.rowIndex), req.body.isOwned);
+  res.json(result);
+});
+
+app.get('/api/characters/all', (req, res) => {
+  console.log('👥 全キャラクター取得API呼び出し');
+  try {
+    const characters = mockData.getAllCharacters();
+    res.json(characters);
+  } catch (error) {
+    console.error('❌ 全キャラクター取得エラー:', error);
+    res.status(500).json({ error: 'Internal Server Error', message: error.message });
+  }
+});
+
+app.get('/api/characters/unowned', (req, res) => {
+  console.log('👥 未所持キャラクター取得API呼び出し');
+  try {
+    const characters = mockData.getUnownedCharacters();
+    res.json(characters);
+  } catch (error) {
+    console.error('❌ 未所持キャラクター取得エラー:', error);
+    res.status(500).json({ error: 'Internal Server Error', message: error.message });
+  }
+});
+
 // 開発用エンドポイント
 app.get('/api/dev/reload-mock', (req, res) => {
   console.log('🔄 モックデータリロード');

@@ -480,6 +480,14 @@ section h2 {
   justify-content: center;
   align-items: center;
   z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.modal-overlay.show {
+  opacity: 1;
+  visibility: visible;
 }
 
 .modal-content {
@@ -491,6 +499,12 @@ section h2 {
   max-height: 80vh;
   overflow-y: auto;
   position: relative;
+  transform: scale(0.7);
+  transition: transform 0.3s ease;
+}
+
+.modal-overlay.show .modal-content {
+  transform: scale(1);
 }
 
 .modal-close {
@@ -502,10 +516,18 @@ section h2 {
   font-size: 1.5rem;
   cursor: pointer;
   color: #666;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
 }
 
 .modal-close:hover {
   color: #333;
+  background: #f8f9fa;
 }
 
 .character-detail-header {
@@ -516,14 +538,257 @@ section h2 {
 }
 
 .character-detail-name {
-  font-size: 1.5rem;
+  font-size: 1.8rem;
   font-weight: bold;
   color: #2c3e50;
   margin-bottom: 0.5rem;
 }
 
+.character-detail-id {
+  font-size: 1rem;
+  color: #666;
+  margin-bottom: 1rem;
+}
+
+.character-detail-info {
+  margin-bottom: 2rem;
+}
+
+.character-detail-info p {
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.character-detail-info strong {
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+/* ===== 所持ステータス管理 ===== */
+.ownership-controls {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  border: 2px solid #e1e8ed;
+}
+
+.ownership-controls h3 {
+  font-size: 1.2rem;
+  color: #2c3e50;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.ownership-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.ownership-btn {
+  padding: 0.75rem 1.5rem;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 120px;
+  justify-content: center;
+}
+
+.ownership-btn.owned {
+  background: #d4edda;
+  color: #155724;
+  border-color: #c3e6cb;
+}
+
+.ownership-btn.owned:hover {
+  background: #c3e6cb;
+  border-color: #b8dacc;
+}
+
+.ownership-btn.owned.active {
+  background: #28a745;
+  color: white;
+  border-color: #28a745;
+}
+
+.ownership-btn.unowned {
+  background: #f8d7da;
+  color: #721c24;
+  border-color: #f5c6cb;
+}
+
+.ownership-btn.unowned:hover {
+  background: #f5c6cb;
+  border-color: #f1b0b7;
+}
+
+.ownership-btn.unowned.active {
+  background: #dc3545;
+  color: white;
+  border-color: #dc3545;
+}
+
+.ownership-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ownership-btn .icon {
+  font-size: 1.1rem;
+}
+
+/* ===== 所持済みキャラクターの視覚的区別 ===== */
+.character-card.owned {
+  border-color: #28a745;
+  background: linear-gradient(135deg, #d4edda 0%, #ffffff 100%);
+  position: relative;
+}
+
+.character-card.owned::before {
+  content: '✓';
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: #28a745;
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+.character-card.owned .character-name {
+  color: #155724;
+}
+
+.character-card.owned:hover {
+  border-color: #1e7e34;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.2);
+}
+
+/* ===== 所持済み表示切り替え ===== */
+.display-controls {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 600;
+  color: #555;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 24px;
+  background-color: #ccc;
+  border-radius: 24px;
+  margin-right: 0.75rem;
+  transition: background-color 0.2s ease;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+}
+
+.toggle-switch input:checked + .slider {
+  background-color: #3498db;
+}
+
+.toggle-switch input:checked + .slider:before {
+  transform: translateX(26px);
+}
+
+.slider:hover {
+  background-color: #bbb;
+}
+
+.toggle-switch input:checked + .slider:hover {
+  background-color: #2980b9;
+}
+
+/* ===== ローディング状態 ===== */
+.ownership-btn.loading {
+  position: relative;
+  color: transparent;
+}
+
+.ownership-btn.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.ownership-btn.owned.loading::after {
+  border-top-color: #155724;
+}
+
+.ownership-btn.unowned.loading::after {
+  border-top-color: #721c24;
+}
+
+.ownership-btn.owned.active.loading::after,
+.ownership-btn.unowned.active.loading::after {
+  border-top-color: white;
+}
+
+/* ===== 類似キャラクター ===== */
 .similar-characters {
   margin-top: 1.5rem;
+}
+
+.similar-characters h4 {
+  font-size: 1.1rem;
+  color: #2c3e50;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e1e8ed;
 }
 
 .similar-character-item {
@@ -534,6 +799,11 @@ section h2 {
   background: #f8f9fa;
   border-radius: 6px;
   margin-bottom: 0.5rem;
+  transition: background-color 0.2s ease;
+}
+
+.similar-character-item:hover {
+  background: #e9ecef;
 }
 
 .similarity-score {

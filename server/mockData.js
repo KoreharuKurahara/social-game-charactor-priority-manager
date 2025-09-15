@@ -402,11 +402,43 @@ function updatePriority(rowIndex, priority) {
   return { success: true };
 }
 
+/**
+ * 所持ステータス更新
+ */
+function updateOwnershipStatus(rowIndex, isOwned) {
+  const character = mockCharacters.find(c => c.rowIndex === rowIndex);
+  if (!character) {
+    throw new Error('キャラクターが見つかりません');
+  }
+
+  character.owned = isOwned;
+  console.log(`✅ 所持ステータス更新: ${character.name} → ${isOwned ? '所持済み' : '未所持'}`);
+
+  return { success: true };
+}
+
+/**
+ * 全キャラクター取得
+ */
+function getAllCharacters() {
+  return [...mockCharacters]; // コピーを返す
+}
+
+/**
+ * 未所持キャラクター取得
+ */
+function getUnownedCharacters() {
+  return mockCharacters.filter(c => !c.owned);
+}
+
 module.exports = {
   getStatistics,
   getUnownedCharactersWithOptions,
   getCharactersWithPagination,
   getCharacterDetails,
   getDashboardData,
-  updatePriority
+  updatePriority,
+  updateOwnershipStatus,
+  getAllCharacters,
+  getUnownedCharacters
 };
