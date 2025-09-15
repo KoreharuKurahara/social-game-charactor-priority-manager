@@ -126,9 +126,43 @@
           <button id="retryBtn" class="btn btn-secondary">再試行</button>
         </div>
         
+        <!-- ソート・表示設定 -->
+        <div class="list-controls-extended">
+          <div class="sort-controls">
+            <label for="sortBy">並び替え:</label>
+            <select id="sortBy">
+              <option value="priority">優先度順</option>
+              <option value="name">名前順</option>
+              <option value="attribute">属性順</option>
+              <option value="id">ID順</option>
+            </select>
+            <select id="sortOrder">
+              <option value="desc">降順</option>
+              <option value="asc">昇順</option>
+            </select>
+          </div>
+          
+          <div class="page-size-controls">
+            <label for="pageSize">表示件数:</label>
+            <select id="pageSize">
+              <option value="10">10件</option>
+              <option value="20" selected>20件</option>
+              <option value="50">50件</option>
+              <option value="100">100件</option>
+            </select>
+          </div>
+        </div>
+
         <!-- キャラクター一覧 -->
         <div id="characterList" class="character-grid">
           <!-- キャラクターカードがここに動的に追加される -->
+        </div>
+        
+        <!-- ページネーション -->
+        <div id="paginationControls" class="pagination-controls" style="display: none;">
+          <button id="prevPage" class="btn btn-secondary">← 前のページ</button>
+          <span id="pageInfo" class="page-info">1 / 1</span>
+          <button id="nextPage" class="btn btn-secondary">次のページ →</button>
         </div>
         
         <!-- 空の状態 -->

@@ -8,6 +8,14 @@ let currentFilters = {
   shop: '',
   priority: ''
 };
+let currentPage = 1;
+let pageSize = 20;
+let totalPages = 1;
+let currentSort = {
+  sortBy: 'priority',
+  sortOrder: 'desc'
+};
+let dashboardData = null;
 
 // ===== 初期化 =====
 document.addEventListener('DOMContentLoaded', function() {
@@ -68,42 +76,64 @@ function loadInitialData() {
   showLoading();
   hideError();
   
-  // 統計情報を取得
+  // ダッシュボードデータを取得
   google.script.run
-    .withSuccessHandler(handleStatisticsSuccess)
+    .withSuccessHandler(handleDashboardSuccess)
     .withFailureHandler(handleError)
-    .getStatistics();
+    .getDashboardData();
   
-  // キャラクターデータを取得
+  // ページネーション付きキャラクターデータを取得
+  loadCharactersWithPagination();
+}
+
+function loadCharactersWithPagination() {
+  const options = {
+    page: currentPage,
+    pageSize: pageSize,
+    sortBy: currentSort.sortBy,
+    sortOrder: currentSort.sortOrder,
+    ...currentFilters
+  };
+  
   google.script.run
-    .withSuccessHandler(handleCharactersSuccess)
+    .withSuccessHandler(handlePaginatedCharactersSuccess)
     .withFailureHandler(handleError)
-    .getUnownedCharactersWithOptions({});
+    .getCharactersWithPagination(options);
 }
 
-// ===== 統計情報処理 =====
-function handleStatisticsSuccess(stats) {
-  console.log('統計情報取得成功:', stats);
-  updateStatisticsDisplay(stats);
+// ===== ダッシュボードデータ処理 =====
+function handleDashboardSuccess(data) {
+  console.log('ダッシュボードデータ取得成功:', data);
+  dashboardData = data;
+  updateStatisticsDisplay(data.overview);
+  updateRecommendations(data.recommendations);
 }
 
-function updateStatisticsDisplay(stats) {
-  document.getElementById('totalCharacters').textContent = stats.total;
-  document.getElementById('ownedCharacters').textContent = stats.owned;
-  document.getElementById('unownedCharacters').textContent = stats.unowned;
-  document.getElementById('prioritySetCharacters').textContent = stats.priorities.set;
+function updateStatisticsDisplay(overview) {
+  document.getElementById('totalCharacters').textContent = overview.totalCharacters;
+  document.getElementById('ownedCharacters').textContent = overview.ownedCharacters;
+  document.getElementById('unownedCharacters').textContent = overview.unownedCharacters;
+  document.getElementById('prioritySetCharacters').textContent = overview.prioritySetCharacters;
 }
 
-// ===== キャラクターデータ処理 =====
-function handleCharactersSuccess(characters) {
-  console.log('キャラクターデータ取得成功:', characters.length + '体');
+function updateRecommendations(recommendations) {
+  // 推奨事項の表示（後で実装）
+  console.log('推奨事項:', recommendations);
+}
+
+// ===== ページネーション付きキャラクターデータ処理 =====
+function handlePaginatedCharactersSuccess(data) {
+  console.log('ページネーションデータ取得成功:', data);
   
-  allCharacters = characters;
-  filteredCharacters = [...characters];
+  filteredCharacters = data.characters;
+  currentPage = data.pagination.currentPage;
+  totalPages = data.pagination.totalPages;
   
   hideLoading();
   renderCharacterList();
-  updateCharacterCount();
+  updateCharacterCount(data.pagination.totalCount);
+  updatePaginationControls(data.pagination);
+  updateSortControls(data.sort);
 }
 
 function handleError(error) {
@@ -240,7 +270,7 @@ function createCharacterCard(character) {
   const shopTags = getShopTags(character);
   
   return `
-    <div class="character-card" data-character-id="${character.id}" data-row-index="${character.rowIndex}">
+    <div class="character-card" data-character-id="${character.id}" data-row-index="${character.rowIndex}" onclick="showCharacterDetails('${character.id}')">
       <div class="character-header">
         <div>
           <div class="character-name">${escapeHtml(character.name)}</div>
@@ -258,7 +288,7 @@ function createCharacterCard(character) {
         </div>
       </div>
       
-      <div class="character-priority">
+      <div class="character-priority" onclick="event.stopPropagation()">
         <div class="priority-label">優先度 (1-10)</div>
         ${priorityDisplay}
       </div>
@@ -418,13 +448,165 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// ===== Google Apps Script関数の呼び出し用ラッパー =====
-function getStatistics() {
-  return CharacterService.getStatistics();
+// ===== ページネーション・ソート制御 =====
+function updatePaginationControls(pagination) {
+  const paginationDiv = document.getElementById('paginationControls');
+  const prevBtn = document.getElementById('prevPage');
+  const nextBtn = document.getElementById('nextPage');
+  const pageInfo = document.getElementById('pageInfo');
+  
+  if (pagination.totalPages > 1) {
+    paginationDiv.style.display = 'flex';
+    prevBtn.disabled = !pagination.hasPrev;
+    nextBtn.disabled = !pagination.hasNext;
+    pageInfo.textContent = `${pagination.currentPage} / ${pagination.totalPages}`;
+  } else {
+    paginationDiv.style.display = 'none';
+  }
 }
 
-function getUnownedCharactersWithOptions(options) {
-  return CharacterService.getUnownedCharactersWithOptions(options);
+function updateSortControls(sort) {
+  document.getElementById('sortBy').value = sort.sortBy;
+  document.getElementById('sortOrder').value = sort.sortOrder;
+}
+
+function updateCharacterCount(totalCount) {
+  const count = totalCount || filteredCharacters.length;
+  document.getElementById('characterCount').textContent = count + '体';
+}
+
+// ===== イベントリスナー拡張 =====
+function setupExtendedEventListeners() {
+  // ページネーション
+  document.getElementById('prevPage').addEventListener('click', function() {
+    if (currentPage > 1) {
+      currentPage--;
+      loadCharactersWithPagination();
+    }
+  });
+  
+  document.getElementById('nextPage').addEventListener('click', function() {
+    if (currentPage < totalPages) {
+      currentPage++;
+      loadCharactersWithPagination();
+    }
+  });
+  
+  // ソート
+  document.getElementById('sortBy').addEventListener('change', function(e) {
+    currentSort.sortBy = e.target.value;
+    currentPage = 1;
+    loadCharactersWithPagination();
+  });
+  
+  document.getElementById('sortOrder').addEventListener('change', function(e) {
+    currentSort.sortOrder = e.target.value;
+    currentPage = 1;
+    loadCharactersWithPagination();
+  });
+  
+  // ページサイズ
+  document.getElementById('pageSize').addEventListener('change', function(e) {
+    pageSize = parseInt(e.target.value);
+    currentPage = 1;
+    loadCharactersWithPagination();
+  });
+}
+
+// ===== キャラクター詳細モーダル =====
+function showCharacterDetails(characterId) {
+  google.script.run
+    .withSuccessHandler(function(details) {
+      renderCharacterModal(details);
+    })
+    .withFailureHandler(function(error) {
+      alert('キャラクター詳細の取得に失敗しました: ' + error.message);
+    })
+    .getCharacterDetails(characterId);
+}
+
+function renderCharacterModal(details) {
+  const character = details.character;
+  const similar = details.similarCharacters;
+  
+  const modalHtml = `
+    <div class="modal-overlay" id="characterModal" onclick="closeModal(event)">
+      <div class="modal-content" onclick="event.stopPropagation()">
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+        
+        <div class="character-detail-header">
+          <div class="character-detail-name">${escapeHtml(character.name)}</div>
+          <div class="character-attribute ${getAttributeClass(character.attribute)}">
+            ${escapeHtml(character.attribute)}
+          </div>
+        </div>
+        
+        <div class="character-detail-info">
+          <p><strong>ID:</strong> ${escapeHtml(character.id)}</p>
+          <p><strong>HC:</strong> ${escapeHtml(character.hc || 'なし')}</p>
+          <p><strong>優先度:</strong> ${character.priority || '未設定'}</p>
+          <p><strong>入手方法:</strong> ${getShopInfo(character)}</p>
+        </div>
+        
+        ${similar.length > 0 ? `
+          <div class="similar-characters">
+            <h4>類似キャラクター</h4>
+            ${similar.map(item => `
+              <div class="similar-character-item">
+                <span>${escapeHtml(item.character.name)} (${escapeHtml(item.character.attribute)})</span>
+                <span class="similarity-score">類似度: ${item.similarity}</span>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+      </div>
+    </div>
+  `;
+  
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function closeModal(event) {
+  if (!event || event.target.id === 'characterModal' || event.target.className === 'modal-close') {
+    const modal = document.getElementById('characterModal');
+    if (modal) {
+      modal.remove();
+    }
+  }
+}
+
+function getShopInfo(character) {
+  const shops = [];
+  if (character.specialShop) shops.push('スペシャルショップ');
+  if (character.greatShop) shops.push('グレートショップ');
+  return shops.length > 0 ? shops.join(', ') : '通常ガチャ';
+}
+
+// ===== 初期化の拡張 =====
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('アプリケーション初期化開始');
+  
+  // 基本イベントリスナーの設定
+  setupEventListeners();
+  
+  // 拡張イベントリスナーの設定
+  setupExtendedEventListeners();
+  
+  // 初期データの読み込み
+  loadInitialData();
+});
+
+// ===== Google Apps Script関数の呼び出し用ラッパー =====
+function getDashboardData() {
+  return UIController.getDashboardData();
+}
+
+function getCharactersWithPagination(options) {
+  return UIController.getCharactersWithPagination(options);
+}
+
+function getCharacterDetails(characterId) {
+  return UIController.getCharacterDetails(characterId);
 }
 
 function updatePriority(rowIndex, priority) {
