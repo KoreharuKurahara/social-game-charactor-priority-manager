@@ -1,0 +1,433 @@
+<script>
+// ===== グローバル変数 =====
+let allCharacters = [];
+let filteredCharacters = [];
+let currentFilters = {
+  search: '',
+  attribute: '',
+  shop: '',
+  priority: ''
+};
+
+// ===== 初期化 =====
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('アプリケーション初期化開始');
+  
+  // イベントリスナーの設定
+  setupEventListeners();
+  
+  // 初期データの読み込み
+  loadInitialData();
+});
+
+// ===== イベントリスナー設定 =====
+function setupEventListeners() {
+  // 更新ボタン
+  document.getElementById('refreshBtn').addEventListener('click', function() {
+    loadInitialData();
+  });
+  
+  // 再試行ボタン
+  document.getElementById('retryBtn').addEventListener('click', function() {
+    loadInitialData();
+  });
+  
+  // フィルタークリアボタン
+  document.getElementById('clearFilters').addEventListener('click', function() {
+    clearAllFilters();
+  });
+  
+  // 検索入力
+  document.getElementById('searchInput').addEventListener('input', function(e) {
+    currentFilters.search = e.target.value;
+    applyFilters();
+  });
+  
+  // 属性フィルター
+  document.getElementById('attributeFilter').addEventListener('change', function(e) {
+    currentFilters.attribute = e.target.value;
+    applyFilters();
+  });
+  
+  // ショップフィルター
+  document.getElementById('shopFilter').addEventListener('change', function(e) {
+    currentFilters.shop = e.target.value;
+    applyFilters();
+  });
+  
+  // 優先度フィルター
+  document.getElementById('priorityFilter').addEventListener('change', function(e) {
+    currentFilters.priority = e.target.value;
+    applyFilters();
+  });
+}
+
+// ===== データ読み込み =====
+function loadInitialData() {
+  console.log('データ読み込み開始');
+  showLoading();
+  hideError();
+  
+  // 統計情報を取得
+  google.script.run
+    .withSuccessHandler(handleStatisticsSuccess)
+    .withFailureHandler(handleError)
+    .getStatistics();
+  
+  // キャラクターデータを取得
+  google.script.run
+    .withSuccessHandler(handleCharactersSuccess)
+    .withFailureHandler(handleError)
+    .getUnownedCharactersWithOptions({});
+}
+
+// ===== 統計情報処理 =====
+function handleStatisticsSuccess(stats) {
+  console.log('統計情報取得成功:', stats);
+  updateStatisticsDisplay(stats);
+}
+
+function updateStatisticsDisplay(stats) {
+  document.getElementById('totalCharacters').textContent = stats.total;
+  document.getElementById('ownedCharacters').textContent = stats.owned;
+  document.getElementById('unownedCharacters').textContent = stats.unowned;
+  document.getElementById('prioritySetCharacters').textContent = stats.priorities.set;
+}
+
+// ===== キャラクターデータ処理 =====
+function handleCharactersSuccess(characters) {
+  console.log('キャラクターデータ取得成功:', characters.length + '体');
+  
+  allCharacters = characters;
+  filteredCharacters = [...characters];
+  
+  hideLoading();
+  renderCharacterList();
+  updateCharacterCount();
+}
+
+function handleError(error) {
+  console.error('エラー発生:', error);
+  hideLoading();
+  showError();
+}
+
+// ===== フィルタリング =====
+function applyFilters() {
+  console.log('フィルター適用:', currentFilters);
+  
+  filteredCharacters = allCharacters.filter(character => {
+    // 検索フィルター
+    if (currentFilters.search) {
+      const searchTerm = currentFilters.search.toLowerCase();
+      if (!character.name.toLowerCase().includes(searchTerm)) {
+        return false;
+      }
+    }
+    
+    // 属性フィルター
+    if (currentFilters.attribute) {
+      if (character.attribute !== currentFilters.attribute) {
+        return false;
+      }
+    }
+    
+    // ショップフィルター
+    if (currentFilters.shop) {
+      switch (currentFilters.shop) {
+        case 'special':
+          if (!character.specialShop) return false;
+          break;
+        case 'great':
+          if (!character.greatShop) return false;
+          break;
+        case 'both':
+          if (!character.specialShop || !character.greatShop) return false;
+          break;
+        case 'either':
+          if (!character.specialShop && !character.greatShop) return false;
+          break;
+        case 'none':
+          if (character.specialShop || character.greatShop) return false;
+          break;
+      }
+    }
+    
+    // 優先度フィルター
+    if (currentFilters.priority) {
+      const hasPriority = character.priority !== null && character.priority !== '';
+      if (currentFilters.priority === 'set' && !hasPriority) return false;
+      if (currentFilters.priority === 'unset' && hasPriority) return false;
+    }
+    
+    return true;
+  });
+  
+  renderCharacterList();
+  updateCharacterCount();
+}
+
+function clearAllFilters() {
+  currentFilters = {
+    search: '',
+    attribute: '',
+    shop: '',
+    priority: ''
+  };
+  
+  // フォームをリセット
+  document.getElementById('searchInput').value = '';
+  document.getElementById('attributeFilter').value = '';
+  document.getElementById('shopFilter').value = '';
+  document.getElementById('priorityFilter').value = '';
+  
+  // フィルターを適用
+  applyFilters();
+}
+
+// ===== UI表示制御 =====
+function showLoading() {
+  document.getElementById('loadingIndicator').style.display = 'block';
+  document.getElementById('characterList').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'none';
+}
+
+function hideLoading() {
+  document.getElementById('loadingIndicator').style.display = 'none';
+}
+
+function showError() {
+  document.getElementById('errorMessage').style.display = 'block';
+  document.getElementById('characterList').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'none';
+}
+
+function hideError() {
+  document.getElementById('errorMessage').style.display = 'none';
+}
+
+function updateCharacterCount() {
+  const count = filteredCharacters.length;
+  document.getElementById('characterCount').textContent = count + '体';
+}
+
+// ===== キャラクター一覧レンダリング =====
+function renderCharacterList() {
+  const container = document.getElementById('characterList');
+  const emptyState = document.getElementById('emptyState');
+  
+  if (filteredCharacters.length === 0) {
+    container.style.display = 'none';
+    emptyState.style.display = 'block';
+    return;
+  }
+  
+  container.style.display = 'grid';
+  emptyState.style.display = 'none';
+  
+  // キャラクターカードを生成
+  container.innerHTML = filteredCharacters.map(character => 
+    createCharacterCard(character)
+  ).join('');
+  
+  // 優先度入力のイベントリスナーを設定
+  setupPriorityInputs();
+}
+
+function createCharacterCard(character) {
+  const attributeClass = getAttributeClass(character.attribute);
+  const priorityDisplay = getPriorityDisplay(character.priority);
+  const shopTags = getShopTags(character);
+  
+  return `
+    <div class="character-card" data-character-id="${character.id}" data-row-index="${character.rowIndex}">
+      <div class="character-header">
+        <div>
+          <div class="character-name">${escapeHtml(character.name)}</div>
+          <div class="character-id">ID: ${escapeHtml(character.id)}</div>
+        </div>
+        <div class="character-attribute ${attributeClass}">
+          ${escapeHtml(character.attribute)}
+        </div>
+      </div>
+      
+      <div class="character-info">
+        <div class="character-hc">${escapeHtml(character.hc || 'HC情報なし')}</div>
+        <div class="character-shops">
+          ${shopTags}
+        </div>
+      </div>
+      
+      <div class="character-priority">
+        <div class="priority-label">優先度 (1-10)</div>
+        ${priorityDisplay}
+      </div>
+    </div>
+  `;
+}
+
+function getAttributeClass(attribute) {
+  const attributeMap = {
+    'アクティブ': 'attribute-active',
+    'ラブリー': 'attribute-lovely',
+    'フレンドリー': 'attribute-friendly',
+    'リラックス': 'attribute-relaxed',
+    'マイペース': 'attribute-mypace'
+  };
+  return attributeMap[attribute] || '';
+}
+
+function getPriorityDisplay(priority) {
+  if (priority === null || priority === '') {
+    return `
+      <input type="number" 
+             class="priority-input" 
+             min="1" max="10" 
+             placeholder="未設定"
+             data-original-value="">
+    `;
+  } else {
+    const priorityClass = getPriorityClass(priority);
+    return `
+      <input type="number" 
+             class="priority-input" 
+             min="1" max="10" 
+             value="${priority}"
+             data-original-value="${priority}">
+    `;
+  }
+}
+
+function getPriorityClass(priority) {
+  const num = Number(priority);
+  if (num >= 8) return 'priority-high';
+  if (num >= 5) return 'priority-medium';
+  if (num >= 1) return 'priority-low';
+  return 'priority-unset';
+}
+
+function getShopTags(character) {
+  const tags = [];
+  
+  if (character.specialShop) {
+    tags.push('<span class="shop-tag shop-special">スペシャル</span>');
+  }
+  
+  if (character.greatShop) {
+    tags.push('<span class="shop-tag shop-great">グレート</span>');
+  }
+  
+  return tags.join('');
+}
+
+// ===== 優先度入力処理 =====
+function setupPriorityInputs() {
+  const inputs = document.querySelectorAll('.priority-input');
+  
+  inputs.forEach(input => {
+    input.addEventListener('change', function() {
+      handlePriorityChange(this);
+    });
+    
+    input.addEventListener('blur', function() {
+      handlePriorityChange(this);
+    });
+  });
+}
+
+function handlePriorityChange(input) {
+  const card = input.closest('.character-card');
+  const rowIndex = parseInt(card.dataset.rowIndex);
+  const newValue = input.value;
+  const originalValue = input.dataset.originalValue;
+  
+  // 値が変更されていない場合はスキップ
+  if (newValue === originalValue) {
+    return;
+  }
+  
+  // 値の検証
+  if (newValue !== '' && (isNaN(newValue) || newValue < 1 || newValue > 10)) {
+    alert('優先度は1-10の数値で入力してください');
+    input.value = originalValue;
+    return;
+  }
+  
+  // 優先度を更新
+  updatePriority(rowIndex, newValue, input);
+}
+
+function updatePriority(rowIndex, priority, inputElement) {
+  console.log('優先度更新:', rowIndex, priority);
+  
+  // 入力を無効化
+  inputElement.disabled = true;
+  
+  const priorityValue = priority === '' ? null : Number(priority);
+  
+  google.script.run
+    .withSuccessHandler(function(success) {
+      handlePriorityUpdateSuccess(success, inputElement, priority);
+    })
+    .withFailureHandler(function(error) {
+      handlePriorityUpdateError(error, inputElement);
+    })
+    .updatePriority(rowIndex, priorityValue);
+}
+
+function handlePriorityUpdateSuccess(success, inputElement, newValue) {
+  console.log('優先度更新成功');
+  
+  // 入力を有効化
+  inputElement.disabled = false;
+  
+  // 元の値を更新
+  inputElement.dataset.originalValue = newValue;
+  
+  // ローカルデータも更新
+  const card = inputElement.closest('.character-card');
+  const characterId = card.dataset.characterId;
+  
+  const character = allCharacters.find(c => c.id === characterId);
+  if (character) {
+    character.priority = newValue === '' ? null : newValue;
+  }
+  
+  // 統計情報を再読み込み
+  google.script.run
+    .withSuccessHandler(handleStatisticsSuccess)
+    .getStatistics();
+}
+
+function handlePriorityUpdateError(error, inputElement) {
+  console.error('優先度更新エラー:', error);
+  
+  // 入力を有効化
+  inputElement.disabled = false;
+  
+  // 元の値に戻す
+  inputElement.value = inputElement.dataset.originalValue;
+  
+  alert('優先度の更新に失敗しました: ' + error.message);
+}
+
+// ===== ユーティリティ関数 =====
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// ===== Google Apps Script関数の呼び出し用ラッパー =====
+function getStatistics() {
+  return CharacterService.getStatistics();
+}
+
+function getUnownedCharactersWithOptions(options) {
+  return CharacterService.getUnownedCharactersWithOptions(options);
+}
+
+function updatePriority(rowIndex, priority) {
+  return SpreadsheetService.updatePriority(rowIndex, priority);
+}
+</script>

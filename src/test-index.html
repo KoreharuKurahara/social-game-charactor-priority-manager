@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>けものフレンズ3 優先度管理 - テスト</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .header {
+      text-align: center;
+      color: #333;
+      margin-bottom: 30px;
+    }
+    .test-section {
+      margin: 20px 0;
+      padding: 20px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+    }
+    .btn {
+      background: #007bff;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    .btn:hover {
+      background: #0056b3;
+    }
+    .result {
+      margin-top: 10px;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 3px;
+      min-height: 20px;
+    }
+    .loading {
+      color: #666;
+    }
+    .success {
+      color: #28a745;
+    }
+    .error {
+      color: #dc3545;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🦁 けものフレンズ3 優先度管理</h1>
+      <p>デプロイテスト版</p>
+    </div>
+
+    <div class="test-section">
+      <h3>📊 接続テスト</h3>
+      <button class="btn" onclick="testConnection()">接続テスト実行</button>
+      <div id="connectionResult" class="result"></div>
+    </div>
+
+    <div class="test-section">
+      <h3>📈 統計情報テスト</h3>
+      <button class="btn" onclick="testStatistics()">統計情報取得</button>
+      <div id="statisticsResult" class="result"></div>
+    </div>
+
+    <div class="test-section">
+      <h3>👥 キャラクターデータテスト</h3>
+      <button class="btn" onclick="testCharacters()">キャラクター取得</button>
+      <div id="charactersResult" class="result"></div>
+    </div>
+
+    <div class="test-section">
+      <h3>🔧 アプリ情報</h3>
+      <button class="btn" onclick="testAppInfo()">アプリ情報取得</button>
+      <div id="appInfoResult" class="result"></div>
+    </div>
+  </div>
+
+  <script>
+    function showLoading(elementId) {
+      document.getElementById(elementId).innerHTML = '<span class="loading">⏳ 処理中...</span>';
+    }
+
+    function showSuccess(elementId, message) {
+      document.getElementById(elementId).innerHTML = '<span class="success">✅ ' + message + '</span>';
+    }
+
+    function showError(elementId, message) {
+      document.getElementById(elementId).innerHTML = '<span class="error">❌ ' + message + '</span>';
+    }
+
+    function testConnection() {
+      showLoading('connectionResult');
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          showSuccess('connectionResult', 'Google Apps Script接続成功！');
+        })
+        .withFailureHandler(function(error) {
+          showError('connectionResult', '接続エラー: ' + error.message);
+        })
+        .testBasicConnection();
+    }
+
+    function testStatistics() {
+      showLoading('statisticsResult');
+      
+      google.script.run
+        .withSuccessHandler(function(stats) {
+          const message = `統計取得成功！ 総数: ${stats.total}, 未所持: ${stats.unowned}`;
+          showSuccess('statisticsResult', message);
+        })
+        .withFailureHandler(function(error) {
+          showError('statisticsResult', '統計取得エラー: ' + error.message);
+        })
+        .getStatistics();
+    }
+
+    function testCharacters() {
+      showLoading('charactersResult');
+      
+      google.script.run
+        .withSuccessHandler(function(characters) {
+          const message = `キャラクター取得成功！ ${characters.length}体の未所持キャラクター`;
+          showSuccess('charactersResult', message);
+        })
+        .withFailureHandler(function(error) {
+          showError('charactersResult', 'キャラクター取得エラー: ' + error.message);
+        })
+        .getUnownedCharactersWithOptions({});
+    }
+
+    function testAppInfo() {
+      showLoading('appInfoResult');
+      
+      google.script.run
+        .withSuccessHandler(function(info) {
+          const message = `アプリ情報取得成功！ ${info.appName} v${info.version}`;
+          showSuccess('appInfoResult', message);
+        })
+        .withFailureHandler(function(error) {
+          showError('appInfoResult', 'アプリ情報取得エラー: ' + error.message);
+        })
+        .getAppInfo();
+    }
+
+    // ページ読み込み時の初期化
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('テストページ読み込み完了');
+    });
+  </script>
+</body>
+</html>
