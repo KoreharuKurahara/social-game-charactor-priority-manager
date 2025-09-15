@@ -339,7 +339,7 @@ function createCharacterCard(character) {
   const ownedClass = character.owned ? 'owned' : '';
   
   return `
-    <div class="character-card ${ownedClass}" data-character-id="${escapeHtml(character.id)}" data-row-index="${character.rowIndex}" onclick="showCharacterModal('${escapeHtml(character.id)}')">`
+    <div class="character-card ${ownedClass}" data-character-id="${escapeHtml(character.id)}" data-row-index="${character.rowIndex}" onclick="showCharacterModal('${escapeHtml(character.id)}')">
       <div class="character-header">
         <div>
           <div class="character-name">${escapeHtml(character.name)}</div>
