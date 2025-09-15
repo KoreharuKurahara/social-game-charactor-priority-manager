@@ -39,6 +39,9 @@ class SpreadsheetService {
   // 優先度の更新
   updatePriority(characterId, priority)
   
+  // 所持ステータスの更新
+  updateOwnershipStatus(characterId, isOwned)
+  
   // データ検証
   validateSpreadsheetStructure()
 }
@@ -48,6 +51,7 @@ class SpreadsheetService {
 - `getAllCharacters()`: 全キャラクターデータを配列で返却
 - `getUnownedCharacters()`: 所持=FALSEのキャラクターのみ抽出
 - `updatePriority(rowIndex, priority)`: 指定行の優先度を更新
+- `updateOwnershipStatus(rowIndex, isOwned)`: 指定行の所持ステータスを更新
 - `validateSpreadsheetStructure()`: 必要な列の存在確認
 
 ### 2. 優先度管理層 (PriorityService)
@@ -83,11 +87,14 @@ class UIController {
   renderCharacterList(characters)
   renderComparisonView(char1, char2)
   renderFilterControls()
+  renderOwnershipToggle()
   
   // イベント処理
   handlePriorityChange(characterId, newPriority)
+  handleOwnershipChange(characterId, isOwned)
   handleFilterChange(filterType, filterValue)
   handleSortChange(sortType)
+  handleShowOwnedToggle(showOwned)
 }
 ```
 
@@ -104,6 +111,122 @@ class FilterService {
   // ソート
   sortByPriority(characters, order)
   sortByAttribute(characters, attribute)
+}
+```
+
+## 所持ステータス管理機能の詳細設計
+
+### UI コンポーネント設計
+
+#### 1. キャラクター詳細モーダル
+
+```html
+<div class="character-modal" id="characterModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 class="character-name">サーバル</h2>
+      <button class="close-btn" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="character-info">
+        <p><strong>通し番号:</strong> 001</p>
+        <p><strong>属性:</strong> フレンドリー</p>
+        <p><strong>HC:</strong> 5000</p>
+      </div>
+      <div class="ownership-controls">
+        <h3>所持ステータス</h3>
+        <div class="ownership-buttons">
+          <button class="ownership-btn owned active" onclick="setOwnership(123, true)">
+            <i class="icon-check"></i> 所持済み
+          </button>
+          <button class="ownership-btn unowned" onclick="setOwnership(123, false)">
+            <i class="icon-x"></i> 未所持
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+#### 2. キャラクター一覧での所持ステータス表示
+
+```html
+<div class="character-card owned" onclick="openCharacterModal(123)">
+  <div class="ownership-indicator">
+    <i class="icon-check"></i>
+  </div>
+  <div class="character-info">
+    <h3>サーバル</h3>
+    <p>001 - フレンドリー</p>
+  </div>
+</div>
+```
+
+#### 2. 表示切り替えコントロール
+
+```html
+<div class="display-controls">
+  <label class="toggle-switch">
+    <input type="checkbox" id="showOwnedToggle" onchange="handleShowOwnedToggle()">
+    <span class="slider"></span>
+    所持済みを含む
+  </label>
+</div>
+```
+
+### データフロー
+
+```
+キャラクターカードクリック → モーダル表示 → 所持ステータス変更
+                                    ↓
+                              UIController → SpreadsheetService → Google Spreadsheet
+                                    ↓              ↓              ↓
+                              モーダル閉じる ← 状態管理 ← レスポンス処理 ← データ更新完了
+                                    ↓
+                              一覧画面更新
+```
+
+### 状態管理
+
+```javascript
+class CharacterModalManager {
+  constructor() {
+    this.currentCharacter = null;
+    this.isUpdating = false;
+  }
+  
+  openModal(character) {
+    this.currentCharacter = character;
+    this.renderModal(character);
+    this.showModal();
+  }
+  
+  setOwnership(characterId, isOwned) {
+    if (this.isUpdating) return;
+    
+    this.isUpdating = true;
+    this.showLoadingState();
+    
+    // バックエンド更新
+    this.updateSpreadsheet(characterId, isOwned)
+      .then(() => {
+        this.closeModal();
+        this.refreshCharacterList();
+      })
+      .catch(error => {
+        this.showError(`更新に失敗しました: ${error.message}`);
+      })
+      .finally(() => {
+        this.isUpdating = false;
+        this.hideLoadingState();
+      });
+  }
+  
+  closeModal() {
+    this.currentCharacter = null;
+    this.hideModal();
+  }
 }
 ```
 
