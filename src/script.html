@@ -490,10 +490,21 @@ function handlePriorityUpdateSuccess(success, inputElement, newValue) {
     character.priority = newValue === '' ? null : newValue;
   }
   
-  // 統計情報を再読み込み
+  // 統計情報をローカルで更新
+  updateStatisticsAfterOwnershipChange();
+  
+  // ダッシュボードデータを再取得（サーバーから最新データ）
   google.script.run
-    .withSuccessHandler(handleStatisticsSuccess)
-    .getStatistics();
+    .withSuccessHandler(function(data) {
+      dashboardData = data;
+      updateStatisticsDisplay(data.overview);
+      console.log('優先度更新後のダッシュボードデータ更新完了');
+    })
+    .withFailureHandler(function(error) {
+      console.warn('ダッシュボードデータ更新失敗:', error);
+      // ローカル計算の結果を使用
+    })
+    .getDashboardData();
 }
 
 function handlePriorityUpdateError(error, inputElement) {
@@ -658,6 +669,22 @@ function handleOwnershipUpdateSuccess(characterId, isOwned) {
   // allCharactersとfilteredCharactersも更新
   updateLocalCharacterData(characterId, isOwned);
   
+  // 統計情報を更新（ローカル計算）
+  updateStatisticsAfterOwnershipChange();
+  
+  // ダッシュボードデータを再取得（サーバーから最新データ）
+  google.script.run
+    .withSuccessHandler(function(data) {
+      dashboardData = data;
+      updateStatisticsDisplay(data.overview);
+      console.log('ダッシュボードデータ更新完了');
+    })
+    .withFailureHandler(function(error) {
+      console.warn('ダッシュボードデータ更新失敗:', error);
+      // ローカル計算の結果を使用
+    })
+    .getDashboardData();
+  
   // モーダルを閉じる
   closeModal();
   
@@ -697,6 +724,27 @@ function updateLocalCharacterData(characterId, isOwned) {
       break;
     }
   }
+}
+
+function updateStatisticsAfterOwnershipChange() {
+  // ローカルデータから統計情報を計算
+  const totalCharacters = allCharacters.length;
+  const ownedCharacters = allCharacters.filter(c => c.owned).length;
+  const unownedCharacters = totalCharacters - ownedCharacters;
+  const prioritySetCharacters = allCharacters.filter(c => !c.owned && c.priority !== null && c.priority !== '').length;
+  
+  // 統計情報オブジェクトを作成
+  const overview = {
+    totalCharacters: totalCharacters,
+    ownedCharacters: ownedCharacters,
+    unownedCharacters: unownedCharacters,
+    prioritySetCharacters: prioritySetCharacters
+  };
+  
+  // 既存の統計情報表示関数を使用
+  updateStatisticsDisplay(overview);
+  
+  console.log('統計情報更新:', overview);
 }
 
 function closeModal(event) {
