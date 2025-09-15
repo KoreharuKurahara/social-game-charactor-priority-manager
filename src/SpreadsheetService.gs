@@ -102,7 +102,7 @@ var SpreadsheetService = {
         var row = data[i];
         var character = {
           rowIndex: i + 2, // スプレッドシートの実際の行番号（1-indexed + ヘッダー行）
-          id: row[columnIndexes['通し番号']] || '',
+          id: String(row[columnIndexes['通し番号']] || ''), // IDを文字列として正規化
           name: row[columnIndexes['フレンズ名']] || '',
           attribute: row[columnIndexes['属性']] || '',
           hc: row[columnIndexes['HC']] || '',

@@ -135,6 +135,7 @@ function updateRecommendations(recommendations) {
 // ===== キャラクターデータ処理 =====
 function handleAllCharactersSuccess(characters) {
   console.log('全キャラクターデータ取得成功:', characters.length + '体');
+  console.log('最初の3体のID:', characters.slice(0, 3).map(c => c.id));
   allCharacters = characters;
   applyFilters();
   hideLoading();
@@ -142,6 +143,7 @@ function handleAllCharactersSuccess(characters) {
 
 function handleUnownedCharactersSuccess(characters) {
   console.log('未所持キャラクターデータ取得成功:', characters.length + '体');
+  console.log('最初の3体のID:', characters.slice(0, 3).map(c => c.id));
   allCharacters = characters;
   applyFilters();
   hideLoading();
@@ -337,7 +339,7 @@ function createCharacterCard(character) {
   const ownedClass = character.owned ? 'owned' : '';
   
   return `
-    <div class="character-card ${ownedClass}" data-character-id="${character.id}" data-row-index="${character.rowIndex}" onclick="showCharacterModal('${character.id}')">
+    <div class="character-card ${ownedClass}" data-character-id="${escapeHtml(character.id)}" data-row-index="${character.rowIndex}" onclick="showCharacterModal('${escapeHtml(character.id)}')">`
       <div class="character-header">
         <div>
           <div class="character-name">${escapeHtml(character.name)}</div>
@@ -551,14 +553,18 @@ let currentModalCharacter = null;
 let isUpdatingOwnership = false;
 
 function showCharacterModal(characterId) {
+  console.log('モーダル表示要求:', characterId);
+  
   google.script.run
     .withSuccessHandler(function(details) {
+      console.log('キャラクター詳細取得成功:', details);
       renderCharacterModal(details);
     })
     .withFailureHandler(function(error) {
+      console.error('キャラクター詳細取得エラー:', error);
       alert('キャラクター詳細の取得に失敗しました: ' + error.message);
     })
-    .getCharacterDetails(characterId);
+    .getCharacterDetails(String(characterId)); // 文字列として送信
 }
 
 function renderCharacterModal(details) {

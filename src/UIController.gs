@@ -154,15 +154,22 @@ function getCharacterDetails(characterId) {
     var allCharacters = SpreadsheetService.getAllCharacters();
     var character = null;
     
+    // キャラクターIDを文字列として正規化
+    var targetId = String(characterId);
+    
     for (var i = 0; i < allCharacters.length; i++) {
-      if (allCharacters[i].id === characterId) {
+      if (String(allCharacters[i].id) === targetId) {
         character = allCharacters[i];
         break;
       }
     }
     
     if (!character) {
-      throw new Error('キャラクターが見つかりません: ' + characterId);
+      var availableIds = allCharacters.map(function(c) { return String(c.id); }).slice(0, 10);
+      Logger.log('キャラクター検索失敗: 対象ID=' + targetId + ' (型:' + typeof targetId + ')');
+      Logger.log('利用可能ID (最初の10個): ' + availableIds.join(', '));
+      Logger.log('全キャラクター数: ' + allCharacters.length);
+      throw new Error('キャラクターが見つかりません: ' + characterId + ' (利用可能: ' + availableIds.slice(0, 3).join(', ') + '...)');
     }
     
     // 関連情報を追加
