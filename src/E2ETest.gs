@@ -42,6 +42,9 @@ function runE2ETests() {
     // テスト8: 要件9 - 所持ステータス確認・更新機能
     testResults = runTest(testResults, 'test8_OwnershipStatusManagement', '要件9: 所持ステータス確認・更新機能テスト');
     
+    // テスト9: キャラクター詳細取得問題の診断テスト
+    testResults = runTest(testResults, 'test9_CharacterDetailsDebug', 'キャラクター詳細取得問題診断テスト');
+    
     // 結果サマリー
     Logger.log('');
     Logger.log('=== E2Eテスト結果サマリー ===');
@@ -771,6 +774,182 @@ function runRequirement9ActualUpdateTest() {
     
   } catch (error) {
     Logger.log('❌ 要件9実更新テスト実行エラー: ' + error.toString());
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * テスト9: キャラクター詳細取得問題の診断テスト
+ */
+function test9_CharacterDetailsDebug() {
+  try {
+    Logger.log('  --- キャラクター詳細取得問題診断テスト開始 ---');
+    
+    // Step 1: 基本データ取得テスト
+    Logger.log('  Step 1: 基本データ取得テスト');
+    var allCharacters = SpreadsheetService.getAllCharacters();
+    if (!allCharacters || allCharacters.length === 0) {
+      return { success: false, error: 'キャラクターデータが取得できません' };
+    }
+    Logger.log('    全キャラクター数: ' + allCharacters.length);
+    
+    // Step 2: 最初のキャラクターでテスト
+    var testCharacter = allCharacters[0];
+    Logger.log('  Step 2: テスト対象キャラクター');
+    Logger.log('    ID: ' + testCharacter.id + ' (型: ' + typeof testCharacter.id + ')');
+    Logger.log('    名前: ' + testCharacter.name);
+    Logger.log('    行インデックス: ' + testCharacter.rowIndex);
+    
+    // Step 3: getCharacterDetails関数の直接テスト
+    Logger.log('  Step 3: getCharacterDetails関数直接テスト');
+    try {
+      var details = getCharacterDetails(testCharacter.id);
+      
+      Logger.log('    戻り値の型: ' + typeof details);
+      Logger.log('    戻り値がnull: ' + (details === null));
+      Logger.log('    戻り値がundefined: ' + (details === undefined));
+      
+      if (details) {
+        Logger.log('    details.character存在: ' + (!!details.character));
+        if (details.character) {
+          Logger.log('    キャラクター名: ' + details.character.name);
+          Logger.log('    キャラクターID: ' + details.character.id);
+        }
+        Logger.log('    類似キャラクター数: ' + (details.similarCharacters ? details.similarCharacters.length : 'null'));
+        Logger.log('    優先度履歴数: ' + (details.priorityHistory ? details.priorityHistory.length : 'null'));
+        Logger.log('    推奨事項数: ' + (details.recommendations ? details.recommendations.length : 'null'));
+      } else {
+        return { success: false, error: 'getCharacterDetailsがnullを返しました' };
+      }
+      
+    } catch (detailsError) {
+      Logger.log('    getCharacterDetailsエラー: ' + detailsError.toString());
+      return { success: false, error: 'getCharacterDetails実行エラー: ' + detailsError.message };
+    }
+    
+    // Step 4: 複数のキャラクターIDでテスト
+    Logger.log('  Step 4: 複数キャラクターIDテスト');
+    var testIds = allCharacters.slice(0, 3).map(function(c) { return c.id; });
+    
+    for (var i = 0; i < testIds.length; i++) {
+      var testId = testIds[i];
+      Logger.log('    テストID: ' + testId + ' (型: ' + typeof testId + ')');
+      
+      try {
+        var testDetails = getCharacterDetails(testId);
+        if (!testDetails) {
+          Logger.log('    ❌ ID ' + testId + ': nullが返されました');
+        } else if (!testDetails.character) {
+          Logger.log('    ❌ ID ' + testId + ': character プロパティがnull');
+        } else {
+          Logger.log('    ✅ ID ' + testId + ': 正常取得 (' + testDetails.character.name + ')');
+        }
+      } catch (e) {
+        Logger.log('    ❌ ID ' + testId + ': エラー - ' + e.message);
+      }
+    }
+    
+    // Step 5: 存在しないIDでのテスト
+    Logger.log('  Step 5: 存在しないIDテスト');
+    try {
+      var invalidDetails = getCharacterDetails('INVALID_ID_999');
+      Logger.log('    ⚠️  存在しないIDでもデータが返されました: ' + (!!invalidDetails));
+    } catch (invalidError) {
+      Logger.log('    ✅ 存在しないIDで適切にエラーが発生: ' + invalidError.message);
+    }
+    
+    // Step 6: 型変換テスト
+    Logger.log('  Step 6: 型変換テスト');
+    if (allCharacters.length > 0) {
+      var firstChar = allCharacters[0];
+      var originalId = firstChar.id;
+      
+      // 文字列として送信
+      try {
+        var stringResult = getCharacterDetails(String(originalId));
+        Logger.log('    文字列ID(' + String(originalId) + '): ' + (stringResult ? '成功' : 'null'));
+      } catch (e) {
+        Logger.log('    文字列ID(' + String(originalId) + '): エラー - ' + e.message);
+      }
+      
+      // 数値として送信（IDが数値の場合）
+      if (!isNaN(originalId)) {
+        try {
+          var numberResult = getCharacterDetails(Number(originalId));
+          Logger.log('    数値ID(' + Number(originalId) + '): ' + (numberResult ? '成功' : 'null'));
+        } catch (e) {
+          Logger.log('    数値ID(' + Number(originalId) + '): エラー - ' + e.message);
+        }
+      }
+    }
+    
+    // Step 7: 関連関数の個別テスト
+    Logger.log('  Step 7: 関連関数個別テスト');
+    if (allCharacters.length > 0) {
+      var testChar = allCharacters[0];
+      
+      // getSimilarCharacters テスト
+      try {
+        var similar = getSimilarCharacters(testChar);
+        Logger.log('    getSimilarCharacters: 成功 (' + (similar ? similar.length : 0) + '件)');
+      } catch (e) {
+        Logger.log('    getSimilarCharacters: エラー - ' + e.message);
+      }
+      
+      // getPriorityHistory テスト
+      try {
+        var history = getPriorityHistory(testChar.rowIndex);
+        Logger.log('    getPriorityHistory: 成功 (' + (history ? history.length : 0) + '件)');
+      } catch (e) {
+        Logger.log('    getPriorityHistory: エラー - ' + e.message);
+      }
+      
+      // getRecommendations テスト
+      try {
+        var recommendations = getRecommendations(testChar);
+        Logger.log('    getRecommendations: 成功 (' + (recommendations ? recommendations.length : 0) + '件)');
+      } catch (e) {
+        Logger.log('    getRecommendations: エラー - ' + e.message);
+      }
+    }
+    
+    Logger.log('  --- キャラクター詳細取得問題診断テスト完了 ---');
+    return { success: true };
+    
+  } catch (error) {
+    Logger.log('  診断テスト実行エラー: ' + error.toString());
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * キャラクター詳細取得問題の専用診断テスト
+ */
+function runCharacterDetailsDebugTest() {
+  Logger.log('=== キャラクター詳細取得問題診断テスト ===');
+  Logger.log('実行時刻: ' + new Date().toLocaleString('ja-JP'));
+  
+  try {
+    var result = test9_CharacterDetailsDebug();
+    
+    Logger.log('');
+    if (result.success) {
+      Logger.log('🎉 診断テスト完了！詳細ログを確認してください。');
+    } else {
+      Logger.log('❌ 診断テストで問題が発見されました: ' + result.error);
+    }
+    
+    Logger.log('');
+    Logger.log('=== 診断結果の確認方法 ===');
+    Logger.log('1. 上記のログで各ステップの結果を確認');
+    Logger.log('2. ❌マークがついた項目が問題の原因');
+    Logger.log('3. エラーメッセージから具体的な問題を特定');
+    Logger.log('4. 必要に応じてコードを修正');
+    
+    return result;
+    
+  } catch (error) {
+    Logger.log('❌ 診断テスト実行エラー: ' + error.toString());
     return { success: false, error: error.message };
   }
 }
