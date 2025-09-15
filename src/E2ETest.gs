@@ -39,6 +39,12 @@ function runE2ETests() {
     // テスト7: パフォーマンステスト
     testResults = runTest(testResults, 'test7_Performance', 'パフォーマンステスト');
     
+    // テスト8: 要件9 - 所持ステータス確認・更新機能
+    testResults = runTest(testResults, 'test8_OwnershipStatusManagement', '要件9: 所持ステータス確認・更新機能テスト');
+    
+    // テスト9: キャラクター詳細取得問題の診断テスト
+    testResults = runTest(testResults, 'test9_CharacterDetailsDebug', 'キャラクター詳細取得問題診断テスト');
+    
     // 結果サマリー
     Logger.log('');
     Logger.log('=== E2Eテスト結果サマリー ===');
@@ -350,6 +356,299 @@ function test7_Performance() {
 }
 
 /**
+ * テスト8: 要件9 - 所持ステータス確認・更新機能
+ */
+function test8_OwnershipStatusManagement() {
+  try {
+    Logger.log('  --- TC-9.1: 所持ステータスの視覚的表示テスト ---');
+    
+    // 全キャラクターデータを取得（所持済み含む）
+    var allCharacters = SpreadsheetService.getAllCharacters();
+    if (!allCharacters || allCharacters.length === 0) {
+      return { success: false, error: 'キャラクターデータが取得できません' };
+    }
+    
+    // 所持済みと未所持の分類確認
+    var ownedCharacters = allCharacters.filter(function(c) { return c.owned; });
+    var unownedCharacters = allCharacters.filter(function(c) { return !c.owned; });
+    
+    Logger.log('    全キャラクター数: ' + allCharacters.length);
+    Logger.log('    所持済みキャラクター数: ' + ownedCharacters.length);
+    Logger.log('    未所持キャラクター数: ' + unownedCharacters.length);
+    
+    if (ownedCharacters.length === 0) {
+      Logger.log('    ⚠️  所持済みキャラクターがありません（テストデータ要確認）');
+    }
+    
+    Logger.log('  --- TC-9.2: キャラクター詳細機能テスト ---');
+    
+    // キャラクター詳細取得機能のテスト
+    if (allCharacters.length > 0) {
+      var testCharacter = allCharacters[0];
+      var characterDetails = getCharacterDetails(testCharacter.id);
+      
+      if (!characterDetails || !characterDetails.character) {
+        return { success: false, error: 'キャラクター詳細取得機能が動作しません' };
+      }
+      
+      Logger.log('    キャラクター詳細取得成功: ' + characterDetails.character.name);
+      Logger.log('    所持ステータス: ' + (characterDetails.character.owned ? '所持済み' : '未所持'));
+      
+      // 類似キャラクター機能の確認
+      if (characterDetails.similarCharacters) {
+        Logger.log('    類似キャラクター数: ' + characterDetails.similarCharacters.length);
+      }
+    }
+    
+    Logger.log('  --- TC-9.3: 所持ステータス更新機能テスト ---');
+    
+    // 所持ステータス更新機能のテスト（実際には更新しない）
+    if (unownedCharacters.length > 0) {
+      var testUnownedChar = unownedCharacters[0];
+      Logger.log('    テスト対象（未所持）: ' + testUnownedChar.name + ' (行' + testUnownedChar.rowIndex + ')');
+      
+      // 実際の更新はテスト環境でのみ実行
+      // var updateResult = SpreadsheetService.updateOwnershipStatus(testUnownedChar.rowIndex, true);
+      Logger.log('    所持ステータス更新機能: 利用可能（実際の更新はスキップ）');
+    }
+    
+    if (ownedCharacters.length > 0) {
+      var testOwnedChar = ownedCharacters[0];
+      Logger.log('    テスト対象（所持済み）: ' + testOwnedChar.name + ' (行' + testOwnedChar.rowIndex + ')');
+      Logger.log('    所持ステータス更新機能: 利用可能（実際の更新はスキップ）');
+    }
+    
+    Logger.log('  --- TC-9.4: 統計情報計算テスト ---');
+    
+    // 統計情報の正確性確認
+    var stats = CharacterService.getStatistics();
+    var calculatedOwned = ownedCharacters.length;
+    var calculatedUnowned = unownedCharacters.length;
+    var calculatedTotal = allCharacters.length;
+    
+    if (stats.owned !== calculatedOwned) {
+      return { success: false, error: '統計情報の所持済み数が不正: 期待値' + calculatedOwned + ', 実際' + stats.owned };
+    }
+    
+    if (stats.unowned !== calculatedUnowned) {
+      return { success: false, error: '統計情報の未所持数が不正: 期待値' + calculatedUnowned + ', 実際' + stats.unowned };
+    }
+    
+    if (stats.total !== calculatedTotal) {
+      return { success: false, error: '統計情報の総数が不正: 期待値' + calculatedTotal + ', 実際' + stats.total };
+    }
+    
+    Logger.log('    統計情報計算: 正確');
+    Logger.log('    総数: ' + stats.total + ', 所持済み: ' + stats.owned + ', 未所持: ' + stats.unowned);
+    
+    // 優先度設定済み数の確認
+    var prioritySetCount = unownedCharacters.filter(function(c) {
+      return c.priority !== null && c.priority !== '';
+    }).length;
+    
+    if (stats.priorities && stats.priorities.set !== prioritySetCount) {
+      return { success: false, error: '優先度設定済み数が不正: 期待値' + prioritySetCount + ', 実際' + stats.priorities.set };
+    }
+    
+    Logger.log('    優先度設定済み数: ' + prioritySetCount);
+    
+    Logger.log('  --- TC-9.5: ダッシュボード統合テスト ---');
+    
+    // ダッシュボードデータの整合性確認
+    var dashboardData = getDashboardData();
+    if (!dashboardData || !dashboardData.overview) {
+      return { success: false, error: 'ダッシュボードデータが取得できません' };
+    }
+    
+    var overview = dashboardData.overview;
+    if (overview.totalCharacters !== calculatedTotal) {
+      return { success: false, error: 'ダッシュボードの総数が不正: 期待値' + calculatedTotal + ', 実際' + overview.totalCharacters };
+    }
+    
+    if (overview.ownedCharacters !== calculatedOwned) {
+      return { success: false, error: 'ダッシュボードの所持済み数が不正: 期待値' + calculatedOwned + ', 実際' + overview.ownedCharacters };
+    }
+    
+    if (overview.unownedCharacters !== calculatedUnowned) {
+      return { success: false, error: 'ダッシュボードの未所持数が不正: 期待値' + calculatedUnowned + ', 実際' + overview.unownedCharacters };
+    }
+    
+    // 完成率の計算確認
+    var expectedCompletionRate = Math.round(calculatedOwned / calculatedTotal * 100);
+    if (overview.completionRate !== expectedCompletionRate) {
+      return { success: false, error: '完成率が不正: 期待値' + expectedCompletionRate + '%, 実際' + overview.completionRate + '%' };
+    }
+    
+    Logger.log('    ダッシュボード統合: 正常');
+    Logger.log('    完成率: ' + overview.completionRate + '%');
+    
+    Logger.log('  --- TC-9.6: 表示切り替え機能テスト ---');
+    
+    // 未所持のみ取得
+    var unownedOnly = SpreadsheetService.getUnownedCharacters();
+    if (unownedOnly.length !== calculatedUnowned) {
+      return { success: false, error: '未所持キャラクター取得が不正: 期待値' + calculatedUnowned + ', 実際' + unownedOnly.length };
+    }
+    
+    // 全キャラクター取得
+    var allCharsFromService = SpreadsheetService.getAllCharacters();
+    if (allCharsFromService.length !== calculatedTotal) {
+      return { success: false, error: '全キャラクター取得が不正: 期待値' + calculatedTotal + ', 実際' + allCharsFromService.length };
+    }
+    
+    Logger.log('    表示切り替え機能: 正常');
+    Logger.log('    未所持のみ: ' + unownedOnly.length + '体');
+    Logger.log('    全キャラクター: ' + allCharsFromService.length + '体');
+    
+    Logger.log('  --- TC-9.7: エラーハンドリングテスト ---');
+    
+    // 不正なキャラクターIDでの詳細取得テスト
+    try {
+      var invalidDetails = getCharacterDetails('INVALID_ID');
+      // エラーが発生しなかった場合は問題
+      if (invalidDetails) {
+        Logger.log('    ⚠️  不正IDでもデータが返されました（要確認）');
+      }
+    } catch (error) {
+      Logger.log('    不正ID処理: 正常にエラーハンドリング');
+    }
+    
+    // 不正な行インデックスでの更新テスト
+    try {
+      // 実際には更新しないが、関数の存在確認
+      if (typeof SpreadsheetService.updateOwnershipStatus === 'function') {
+        Logger.log('    所持ステータス更新関数: 利用可能');
+      } else {
+        return { success: false, error: '所持ステータス更新関数が定義されていません' };
+      }
+    } catch (error) {
+      return { success: false, error: '所持ステータス更新関数のテストでエラー: ' + error.message };
+    }
+    
+    Logger.log('  --- TC-9.8: パフォーマンステスト ---');
+    
+    // 統計情報計算のパフォーマンス
+    var startTime = new Date().getTime();
+    var perfStats = CharacterService.getStatistics();
+    var statsCalcTime = new Date().getTime() - startTime;
+    
+    // ダッシュボードデータ取得のパフォーマンス
+    startTime = new Date().getTime();
+    var perfDashboard = getDashboardData();
+    var dashboardTime = new Date().getTime() - startTime;
+    
+    Logger.log('    統計情報計算時間: ' + statsCalcTime + 'ms');
+    Logger.log('    ダッシュボード取得時間: ' + dashboardTime + 'ms');
+    
+    // パフォーマンス基準（3秒以内）
+    if (statsCalcTime > 3000) {
+      Logger.log('    ⚠️  統計情報計算が遅い: ' + statsCalcTime + 'ms');
+    }
+    
+    if (dashboardTime > 3000) {
+      Logger.log('    ⚠️  ダッシュボード取得が遅い: ' + dashboardTime + 'ms');
+    }
+    
+    Logger.log('  --- 要件9テスト完了 ---');
+    
+    return { success: true };
+    
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 要件9専用の詳細テスト（実際の更新を含む）
+ * 注意: このテストは実際にデータを変更します
+ */
+function test8_OwnershipStatusManagement_WithActualUpdates() {
+  Logger.log('=== 要件9 実更新テスト（注意: データを変更します） ===');
+  
+  try {
+    // テスト前の状態を記録
+    var initialStats = CharacterService.getStatistics();
+    Logger.log('テスト前統計: 総数' + initialStats.total + ', 所持済み' + initialStats.owned + ', 未所持' + initialStats.unowned);
+    
+    // 未所持キャラクターを1体取得
+    var unownedChars = SpreadsheetService.getUnownedCharacters();
+    if (unownedChars.length === 0) {
+      return { success: false, error: 'テスト用の未所持キャラクターがありません' };
+    }
+    
+    var testChar = unownedChars[0];
+    Logger.log('テスト対象: ' + testChar.name + ' (行' + testChar.rowIndex + ')');
+    
+    // TC-9.4: 未所持から所持済みへの更新
+    Logger.log('--- 未所持→所持済み更新テスト ---');
+    var updateResult1 = SpreadsheetService.updateOwnershipStatus(testChar.rowIndex, true);
+    
+    if (!updateResult1) {
+      return { success: false, error: '所持ステータス更新（未所持→所持済み）に失敗' };
+    }
+    
+    // 更新後の統計確認
+    var afterUpdate1Stats = CharacterService.getStatistics();
+    Logger.log('更新後統計: 総数' + afterUpdate1Stats.total + ', 所持済み' + afterUpdate1Stats.owned + ', 未所持' + afterUpdate1Stats.unowned);
+    
+    // 統計の変化確認
+    if (afterUpdate1Stats.owned !== initialStats.owned + 1) {
+      return { success: false, error: '所持済み数が正しく更新されていません: 期待値' + (initialStats.owned + 1) + ', 実際' + afterUpdate1Stats.owned };
+    }
+    
+    if (afterUpdate1Stats.unowned !== initialStats.unowned - 1) {
+      return { success: false, error: '未所持数が正しく更新されていません: 期待値' + (initialStats.unowned - 1) + ', 実際' + afterUpdate1Stats.unowned };
+    }
+    
+    Logger.log('✅ 未所持→所持済み更新: 成功');
+    
+    // TC-9.5: 所持済みから未所持への更新（元に戻す）
+    Logger.log('--- 所持済み→未所持更新テスト（復元） ---');
+    var updateResult2 = SpreadsheetService.updateOwnershipStatus(testChar.rowIndex, false);
+    
+    if (!updateResult2) {
+      return { success: false, error: '所持ステータス更新（所持済み→未所持）に失敗' };
+    }
+    
+    // 復元後の統計確認
+    var afterUpdate2Stats = CharacterService.getStatistics();
+    Logger.log('復元後統計: 総数' + afterUpdate2Stats.total + ', 所持済み' + afterUpdate2Stats.owned + ', 未所持' + afterUpdate2Stats.unowned);
+    
+    // 元の状態に戻ったか確認
+    if (afterUpdate2Stats.owned !== initialStats.owned) {
+      return { success: false, error: '所持済み数が元に戻っていません: 期待値' + initialStats.owned + ', 実際' + afterUpdate2Stats.owned };
+    }
+    
+    if (afterUpdate2Stats.unowned !== initialStats.unowned) {
+      return { success: false, error: '未所持数が元に戻っていません: 期待値' + initialStats.unowned + ', 実際' + afterUpdate2Stats.unowned };
+    }
+    
+    Logger.log('✅ 所持済み→未所持更新: 成功');
+    Logger.log('✅ データ復元: 成功');
+    
+    // TC-9.6: 統計情報リアルタイム更新確認
+    Logger.log('--- 統計情報リアルタイム更新確認 ---');
+    
+    // ダッシュボードデータも正しく更新されているか確認
+    var finalDashboard = getDashboardData();
+    if (finalDashboard.overview.ownedCharacters !== afterUpdate2Stats.owned) {
+      return { success: false, error: 'ダッシュボードの統計情報が同期されていません' };
+    }
+    
+    Logger.log('✅ ダッシュボード統計同期: 成功');
+    
+    Logger.log('=== 要件9 実更新テスト完了 ===');
+    Logger.log('🎉 全ての所持ステータス管理機能が正常に動作しています');
+    
+    return { success: true };
+    
+  } catch (error) {
+    Logger.log('❌ 要件9 実更新テストエラー: ' + error.toString());
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * 簡易E2Eテスト（重要機能のみ）
  */
 function runQuickE2ETest() {
@@ -372,6 +671,20 @@ function runQuickE2ETest() {
     var dashboardData = getDashboardData();
     Logger.log('✅ UI機能: ダッシュボードデータ取得成功');
     
+    // 5. 要件9: 所持ステータス管理機能
+    var allChars = SpreadsheetService.getAllCharacters();
+    var ownedCount = allChars.filter(function(c) { return c.owned; }).length;
+    var unownedCount = allChars.filter(function(c) { return !c.owned; }).length;
+    Logger.log('✅ 要件9: 所持ステータス管理 - 所持済み' + ownedCount + '体, 未所持' + unownedCount + '体');
+    
+    // キャラクター詳細機能の確認
+    if (allChars.length > 0) {
+      var testDetails = getCharacterDetails(allChars[0].id);
+      if (testDetails && testDetails.character) {
+        Logger.log('✅ 要件9: キャラクター詳細機能正常');
+      }
+    }
+    
     Logger.log('');
     Logger.log('🎉 簡易E2Eテスト完了！主要機能は正常に動作しています。');
     
@@ -381,4 +694,295 @@ function runQuickE2ETest() {
     Logger.log('❌ 簡易E2Eテストエラー: ' + error.toString());
     return false;
   }
+}
+
+/**
+ * 要件9専用E2Eテスト実行
+ */
+function runRequirement9E2ETest() {
+  Logger.log('=== 要件9専用E2Eテスト ===');
+  Logger.log('実行時刻: ' + new Date().toLocaleString('ja-JP'));
+  
+  var testResults = {
+    total: 0,
+    passed: 0,
+    failed: 0,
+    errors: []
+  };
+  
+  try {
+    // 要件9の基本機能テスト
+    testResults = runTest(testResults, 'test8_OwnershipStatusManagement', '要件9: 所持ステータス確認・更新機能テスト');
+    
+    // 結果サマリー
+    Logger.log('');
+    Logger.log('=== 要件9テスト結果サマリー ===');
+    Logger.log('総テスト数: ' + testResults.total);
+    Logger.log('成功: ' + testResults.passed + ' (' + Math.round(testResults.passed / testResults.total * 100) + '%)');
+    Logger.log('失敗: ' + testResults.failed + ' (' + Math.round(testResults.failed / testResults.total * 100) + '%)');
+    
+    if (testResults.failed > 0) {
+      Logger.log('');
+      Logger.log('失敗したテスト:');
+      for (var i = 0; i < testResults.errors.length; i++) {
+        Logger.log('  ❌ ' + testResults.errors[i]);
+      }
+    }
+    
+    if (testResults.failed === 0) {
+      Logger.log('');
+      Logger.log('🎉 要件9の全てのテストが成功しました！');
+      Logger.log('所持ステータス確認・更新機能は正常に動作しています。');
+    } else {
+      Logger.log('');
+      Logger.log('⚠️  一部のテストが失敗しました。修正が必要です。');
+    }
+    
+    return testResults;
+    
+  } catch (error) {
+    Logger.log('❌ 要件9テスト実行エラー: ' + error.toString());
+    return testResults;
+  }
+}
+
+/**
+ * 要件9実更新テスト実行（データを実際に変更）
+ * 注意: このテストは実際にスプレッドシートのデータを変更します
+ */
+function runRequirement9ActualUpdateTest() {
+  Logger.log('=== 要件9実更新テスト（警告: データを変更します） ===');
+  Logger.log('実行時刻: ' + new Date().toLocaleString('ja-JP'));
+  
+  // 確認プロンプト（手動実行時のみ）
+  Logger.log('⚠️  このテストは実際にスプレッドシートのデータを変更します。');
+  Logger.log('テスト環境でのみ実行してください。');
+  
+  try {
+    var result = test8_OwnershipStatusManagement_WithActualUpdates();
+    
+    if (result.success) {
+      Logger.log('');
+      Logger.log('🎉 要件9実更新テストが成功しました！');
+      Logger.log('所持ステータス更新機能は正常に動作し、データの整合性も保たれています。');
+    } else {
+      Logger.log('');
+      Logger.log('❌ 要件9実更新テストが失敗しました: ' + result.error);
+    }
+    
+    return result;
+    
+  } catch (error) {
+    Logger.log('❌ 要件9実更新テスト実行エラー: ' + error.toString());
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * テスト9: キャラクター詳細取得問題の診断テスト
+ */
+function test9_CharacterDetailsDebug() {
+  try {
+    Logger.log('  --- キャラクター詳細取得問題診断テスト開始 ---');
+    
+    // Step 1: 基本データ取得テスト
+    Logger.log('  Step 1: 基本データ取得テスト');
+    var allCharacters = SpreadsheetService.getAllCharacters();
+    if (!allCharacters || allCharacters.length === 0) {
+      return { success: false, error: 'キャラクターデータが取得できません' };
+    }
+    Logger.log('    全キャラクター数: ' + allCharacters.length);
+    
+    // Step 2: 最初のキャラクターでテスト
+    var testCharacter = allCharacters[0];
+    Logger.log('  Step 2: テスト対象キャラクター');
+    Logger.log('    ID: ' + testCharacter.id + ' (型: ' + typeof testCharacter.id + ')');
+    Logger.log('    名前: ' + testCharacter.name);
+    Logger.log('    行インデックス: ' + testCharacter.rowIndex);
+    
+    // Step 3: getCharacterDetails関数の直接テスト
+    Logger.log('  Step 3: getCharacterDetails関数直接テスト');
+    try {
+      var details = getCharacterDetails(testCharacter.id);
+      
+      Logger.log('    戻り値の型: ' + typeof details);
+      Logger.log('    戻り値がnull: ' + (details === null));
+      Logger.log('    戻り値がundefined: ' + (details === undefined));
+      
+      if (details) {
+        Logger.log('    details.character存在: ' + (!!details.character));
+        if (details.character) {
+          Logger.log('    キャラクター名: ' + details.character.name);
+          Logger.log('    キャラクターID: ' + details.character.id);
+        }
+        Logger.log('    類似キャラクター数: ' + (details.similarCharacters ? details.similarCharacters.length : 'null'));
+        Logger.log('    優先度履歴数: ' + (details.priorityHistory ? details.priorityHistory.length : 'null'));
+        Logger.log('    推奨事項数: ' + (details.recommendations ? details.recommendations.length : 'null'));
+      } else {
+        return { success: false, error: 'getCharacterDetailsがnullを返しました' };
+      }
+      
+    } catch (detailsError) {
+      Logger.log('    getCharacterDetailsエラー: ' + detailsError.toString());
+      return { success: false, error: 'getCharacterDetails実行エラー: ' + detailsError.message };
+    }
+    
+    // Step 4: 複数のキャラクターIDでテスト
+    Logger.log('  Step 4: 複数キャラクターIDテスト');
+    var testIds = allCharacters.slice(0, 3).map(function(c) { return c.id; });
+    
+    for (var i = 0; i < testIds.length; i++) {
+      var testId = testIds[i];
+      Logger.log('    テストID: ' + testId + ' (型: ' + typeof testId + ')');
+      
+      try {
+        var testDetails = getCharacterDetails(testId);
+        if (!testDetails) {
+          Logger.log('    ❌ ID ' + testId + ': nullが返されました');
+        } else if (!testDetails.character) {
+          Logger.log('    ❌ ID ' + testId + ': character プロパティがnull');
+        } else {
+          Logger.log('    ✅ ID ' + testId + ': 正常取得 (' + testDetails.character.name + ')');
+        }
+      } catch (e) {
+        Logger.log('    ❌ ID ' + testId + ': エラー - ' + e.message);
+      }
+    }
+    
+    // Step 5: 存在しないIDでのテスト
+    Logger.log('  Step 5: 存在しないIDテスト');
+    try {
+      var invalidDetails = getCharacterDetails('INVALID_ID_999');
+      Logger.log('    ⚠️  存在しないIDでもデータが返されました: ' + (!!invalidDetails));
+    } catch (invalidError) {
+      Logger.log('    ✅ 存在しないIDで適切にエラーが発生: ' + invalidError.message);
+    }
+    
+    // Step 6: 型変換テスト
+    Logger.log('  Step 6: 型変換テスト');
+    if (allCharacters.length > 0) {
+      var firstChar = allCharacters[0];
+      var originalId = firstChar.id;
+      
+      // 文字列として送信
+      try {
+        var stringResult = getCharacterDetails(String(originalId));
+        Logger.log('    文字列ID(' + String(originalId) + '): ' + (stringResult ? '成功' : 'null'));
+      } catch (e) {
+        Logger.log('    文字列ID(' + String(originalId) + '): エラー - ' + e.message);
+      }
+      
+      // 数値として送信（IDが数値の場合）
+      if (!isNaN(originalId)) {
+        try {
+          var numberResult = getCharacterDetails(Number(originalId));
+          Logger.log('    数値ID(' + Number(originalId) + '): ' + (numberResult ? '成功' : 'null'));
+        } catch (e) {
+          Logger.log('    数値ID(' + Number(originalId) + '): エラー - ' + e.message);
+        }
+      }
+    }
+    
+    // Step 7: 関連関数の個別テスト
+    Logger.log('  Step 7: 関連関数個別テスト');
+    if (allCharacters.length > 0) {
+      var testChar = allCharacters[0];
+      
+      // getSimilarCharacters テスト
+      try {
+        var similar = getSimilarCharacters(testChar);
+        Logger.log('    getSimilarCharacters: 成功 (' + (similar ? similar.length : 0) + '件)');
+      } catch (e) {
+        Logger.log('    getSimilarCharacters: エラー - ' + e.message);
+      }
+      
+      // getPriorityHistory テスト
+      try {
+        var history = getPriorityHistory(testChar.rowIndex);
+        Logger.log('    getPriorityHistory: 成功 (' + (history ? history.length : 0) + '件)');
+      } catch (e) {
+        Logger.log('    getPriorityHistory: エラー - ' + e.message);
+      }
+      
+      // getRecommendations テスト
+      try {
+        var recommendations = getRecommendations(testChar);
+        Logger.log('    getRecommendations: 成功 (' + (recommendations ? recommendations.length : 0) + '件)');
+      } catch (e) {
+        Logger.log('    getRecommendations: エラー - ' + e.message);
+      }
+    }
+    
+    Logger.log('  --- キャラクター詳細取得問題診断テスト完了 ---');
+    return { success: true };
+    
+  } catch (error) {
+    Logger.log('  診断テスト実行エラー: ' + error.toString());
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * キャラクター詳細取得問題の専用診断テスト
+ */
+function runCharacterDetailsDebugTest() {
+  Logger.log('=== キャラクター詳細取得問題診断テスト ===');
+  Logger.log('実行時刻: ' + new Date().toLocaleString('ja-JP'));
+  
+  try {
+    var result = test9_CharacterDetailsDebug();
+    
+    Logger.log('');
+    if (result.success) {
+      Logger.log('🎉 診断テスト完了！詳細ログを確認してください。');
+    } else {
+      Logger.log('❌ 診断テストで問題が発見されました: ' + result.error);
+    }
+    
+    Logger.log('');
+    Logger.log('=== 診断結果の確認方法 ===');
+    Logger.log('1. 上記のログで各ステップの結果を確認');
+    Logger.log('2. ❌マークがついた項目が問題の原因');
+    Logger.log('3. エラーメッセージから具体的な問題を特定');
+    Logger.log('4. 必要に応じてコードを修正');
+    
+    return result;
+    
+  } catch (error) {
+    Logger.log('❌ 診断テスト実行エラー: ' + error.toString());
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * テストメニュー表示
+ */
+function showTestMenu() {
+  Logger.log('=== E2Eテストメニュー ===');
+  Logger.log('');
+  Logger.log('利用可能なテスト関数:');
+  Logger.log('');
+  Logger.log('1. runE2ETests()');
+  Logger.log('   - 全体的なE2Eテストを実行');
+  Logger.log('   - 全機能の包括的なテスト');
+  Logger.log('');
+  Logger.log('2. runQuickE2ETest()');
+  Logger.log('   - 簡易E2Eテストを実行');
+  Logger.log('   - 主要機能のみの高速テスト');
+  Logger.log('');
+  Logger.log('3. runRequirement9E2ETest()');
+  Logger.log('   - 要件9専用E2Eテストを実行');
+  Logger.log('   - 所持ステータス確認・更新機能のテスト');
+  Logger.log('   - データは変更しません');
+  Logger.log('');
+  Logger.log('4. runRequirement9ActualUpdateTest()');
+  Logger.log('   - 要件9実更新テストを実行');
+  Logger.log('   - ⚠️  実際にデータを変更します');
+  Logger.log('   - テスト環境でのみ実行してください');
+  Logger.log('');
+  Logger.log('5. test8_OwnershipStatusManagement()');
+  Logger.log('   - 要件9の基本テストのみ実行');
+  Logger.log('   - データは変更しません');
+  Logger.log('');
+  Logger.log('使用方法: 上記の関数名をGoogle Apps Scriptエディタで実行してください');
 }

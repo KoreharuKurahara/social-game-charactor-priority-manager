@@ -135,6 +135,7 @@ function updateRecommendations(recommendations) {
 // ===== キャラクターデータ処理 =====
 function handleAllCharactersSuccess(characters) {
   console.log('全キャラクターデータ取得成功:', characters.length + '体');
+  console.log('最初の3体のID:', characters.slice(0, 3).map(c => c.id));
   allCharacters = characters;
   applyFilters();
   hideLoading();
@@ -142,6 +143,7 @@ function handleAllCharactersSuccess(characters) {
 
 function handleUnownedCharactersSuccess(characters) {
   console.log('未所持キャラクターデータ取得成功:', characters.length + '体');
+  console.log('最初の3体のID:', characters.slice(0, 3).map(c => c.id));
   allCharacters = characters;
   applyFilters();
   hideLoading();
@@ -337,7 +339,7 @@ function createCharacterCard(character) {
   const ownedClass = character.owned ? 'owned' : '';
   
   return `
-    <div class="character-card ${ownedClass}" data-character-id="${character.id}" data-row-index="${character.rowIndex}" onclick="showCharacterModal('${character.id}')">
+    <div class="character-card ${ownedClass}" data-character-id="${escapeHtml(character.id)}" data-row-index="${character.rowIndex}" onclick="showCharacterModal('${escapeHtml(character.id)}')">
       <div class="character-header">
         <div>
           <div class="character-name">${escapeHtml(character.name)}</div>
@@ -551,19 +553,57 @@ let currentModalCharacter = null;
 let isUpdatingOwnership = false;
 
 function showCharacterModal(characterId) {
+  console.log('モーダル表示要求:', characterId);
+  
+  // 入力値検証
+  if (!characterId) {
+    console.error('キャラクターIDが空です');
+    alert('キャラクターIDが指定されていません');
+    return;
+  }
+  
   google.script.run
     .withSuccessHandler(function(details) {
-      renderCharacterModal(details);
+      console.log('キャラクター詳細取得成功:', details);
+      console.log('details型:', typeof details);
+      console.log('details === null:', details === null);
+      console.log('details === undefined:', details === undefined);
+      
+      if (details) {
+        console.log('details.character:', details.character);
+        console.log('details.character型:', typeof details.character);
+      }
+      
+      try {
+        renderCharacterModal(details);
+      } catch (error) {
+        console.error('モーダル描画エラー:', error);
+        alert('モーダルの表示に失敗しました: ' + error.message);
+      }
     })
     .withFailureHandler(function(error) {
-      alert('キャラクター詳細の取得に失敗しました: ' + error.message);
+      console.error('キャラクター詳細取得エラー:', error);
+      alert('キャラクター詳細の取得に失敗しました: ' + (error.message || error.toString()));
     })
-    .getCharacterDetails(characterId);
+    .getCharacterDetails(String(characterId)); // 文字列として送信
 }
 
 function renderCharacterModal(details) {
+  // エラーハンドリング: detailsオブジェクトの検証
+  if (!details) {
+    console.error('キャラクター詳細データが空です');
+    alert('キャラクター詳細データの取得に失敗しました');
+    return;
+  }
+  
+  if (!details.character) {
+    console.error('キャラクターデータが空です:', details);
+    alert('キャラクターデータが見つかりません');
+    return;
+  }
+  
   const character = details.character;
-  const similar = details.similarCharacters;
+  const similar = details.similarCharacters || [];
   currentModalCharacter = character;
   
   const modalHtml = `
@@ -603,15 +643,18 @@ function renderCharacterModal(details) {
           </div>
         </div>
         
-        ${similar.length > 0 ? `
+        ${similar && similar.length > 0 ? `
           <div class="similar-characters">
             <h4>類似キャラクター</h4>
-            ${similar.map(item => `
-              <div class="similar-character-item">
-                <span>${escapeHtml(item.character.name)} (${escapeHtml(item.character.attribute)})</span>
-                <span class="similarity-score">類似度: ${item.similarity}</span>
-              </div>
-            `).join('')}
+            ${similar.map(item => {
+              if (!item || !item.character) return '';
+              return `
+                <div class="similar-character-item">
+                  <span>${escapeHtml(item.character.name || '不明')} (${escapeHtml(item.character.attribute || '不明')})</span>
+                  <span class="similarity-score">類似度: ${item.similarity || 0}</span>
+                </div>
+              `;
+            }).join('')}
           </div>
         ` : ''}
       </div>
