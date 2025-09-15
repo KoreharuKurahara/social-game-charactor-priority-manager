@@ -565,6 +565,15 @@ function showCharacterModal(characterId) {
   google.script.run
     .withSuccessHandler(function(details) {
       console.log('キャラクター詳細取得成功:', details);
+      console.log('details型:', typeof details);
+      console.log('details === null:', details === null);
+      console.log('details === undefined:', details === undefined);
+      
+      if (details) {
+        console.log('details.character:', details.character);
+        console.log('details.character型:', typeof details.character);
+      }
+      
       try {
         renderCharacterModal(details);
       } catch (error) {

@@ -150,16 +150,30 @@ function bulkUpdatePriorities(updates) {
  * @return {Object} 詳細情報
  */
 function getCharacterDetails(characterId) {
+  Logger.log('getCharacterDetails開始: characterId=' + characterId + ' (型:' + typeof characterId + ')');
+  
+  // 入力値検証
+  if (characterId === null || characterId === undefined || characterId === '') {
+    Logger.log('無効なcharacterID: ' + characterId);
+    throw new Error('キャラクターIDが無効です: ' + characterId);
+  }
+  
   try {
+    Logger.log('SpreadsheetService.getAllCharacters()呼び出し開始');
     var allCharacters = SpreadsheetService.getAllCharacters();
+    Logger.log('getAllCharacters完了: ' + allCharacters.length + '体取得');
+    
     var character = null;
     
     // キャラクターIDを文字列として正規化
     var targetId = String(characterId);
+    Logger.log('正規化されたID: ' + targetId);
     
     for (var i = 0; i < allCharacters.length; i++) {
-      if (String(allCharacters[i].id) === targetId) {
+      var currentId = String(allCharacters[i].id);
+      if (currentId === targetId) {
         character = allCharacters[i];
+        Logger.log('キャラクター発見: ' + character.name + ' (インデックス:' + i + ')');
         break;
       }
     }
@@ -172,20 +186,66 @@ function getCharacterDetails(characterId) {
       throw new Error('キャラクターが見つかりません: ' + characterId + ' (利用可能: ' + availableIds.slice(0, 3).join(', ') + '...)');
     }
     
+    Logger.log('関連情報取得開始');
+    
     // 関連情報を追加
+    var similarCharacters = [];
+    var priorityHistory = [];
+    var recommendations = [];
+    
+    try {
+      Logger.log('getSimilarCharacters呼び出し');
+      similarCharacters = getSimilarCharacters(character) || [];
+      Logger.log('類似キャラクター取得完了: ' + similarCharacters.length + '体');
+    } catch (e) {
+      Logger.log('類似キャラクター取得エラー: ' + e.toString());
+      similarCharacters = [];
+    }
+    
+    try {
+      Logger.log('getPriorityHistory呼び出し');
+      priorityHistory = getPriorityHistory(character.rowIndex) || [];
+      Logger.log('優先度履歴取得完了');
+    } catch (e) {
+      Logger.log('優先度履歴取得エラー: ' + e.toString());
+      priorityHistory = [];
+    }
+    
+    try {
+      Logger.log('getRecommendations呼び出し');
+      recommendations = getRecommendations(character) || [];
+      Logger.log('推奨事項取得完了: ' + recommendations.length + '件');
+    } catch (e) {
+      Logger.log('推奨事項取得エラー: ' + e.toString());
+      recommendations = [];
+    }
+    
     var details = {
       character: character,
-      similarCharacters: getSimilarCharacters(character) || [],
-      priorityHistory: getPriorityHistory(character.rowIndex) || [],
-      recommendations: getRecommendations(character) || []
+      similarCharacters: similarCharacters,
+      priorityHistory: priorityHistory,
+      recommendations: recommendations
     };
     
     Logger.log('キャラクター詳細取得成功: ' + character.name + ' (ID: ' + character.id + ')');
+    Logger.log('詳細オブジェクト: ' + JSON.stringify({
+      hasCharacter: !!details.character,
+      characterName: details.character ? details.character.name : 'null',
+      similarCount: details.similarCharacters.length,
+      historyCount: details.priorityHistory.length,
+      recommendationCount: details.recommendations.length
+    }));
+    
     return details;
     
   } catch (error) {
     Logger.log('キャラクター詳細取得エラー: ' + error.toString());
-    throw new Error('キャラクター詳細の取得に失敗しました: ' + error.message);
+    Logger.log('エラースタック: ' + (error.stack || 'スタック情報なし'));
+    
+    // エラーオブジェクトを返すのではなく、エラーを再スローする
+    var errorMessage = 'キャラクター詳細の取得に失敗しました: ' + error.message;
+    Logger.log('エラーメッセージ: ' + errorMessage);
+    throw new Error(errorMessage);
   }
 }
 
