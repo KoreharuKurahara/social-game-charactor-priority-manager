@@ -16,6 +16,7 @@ let currentSort = {
   sortOrder: 'desc'
 };
 let dashboardData = null;
+let showOwnedCharacters = false;
 
 // ===== 初期化 =====
 document.addEventListener('DOMContentLoaded', function() {
@@ -68,6 +69,13 @@ function setupEventListeners() {
     currentFilters.priority = e.target.value;
     applyFilters();
   });
+  
+  // 所持済み表示切り替え
+  document.getElementById('showOwnedToggle').addEventListener('change', function(e) {
+    showOwnedCharacters = e.target.checked;
+    updateSectionTitle();
+    loadInitialData();
+  });
 }
 
 // ===== データ読み込み =====
@@ -82,24 +90,27 @@ function loadInitialData() {
     .withFailureHandler(handleError)
     .getDashboardData();
   
-  // ページネーション付きキャラクターデータを取得
-  loadCharactersWithPagination();
+  // キャラクターデータを取得
+  loadCharacterData();
 }
 
-function loadCharactersWithPagination() {
-  const options = {
-    page: currentPage,
-    pageSize: pageSize,
-    sortBy: currentSort.sortBy,
-    sortOrder: currentSort.sortOrder,
-    ...currentFilters
-  };
-  
-  google.script.run
-    .withSuccessHandler(handlePaginatedCharactersSuccess)
-    .withFailureHandler(handleError)
-    .getCharactersWithPagination(options);
+function loadCharacterData() {
+  if (showOwnedCharacters) {
+    // 全キャラクターを取得
+    google.script.run
+      .withSuccessHandler(handleAllCharactersSuccess)
+      .withFailureHandler(handleError)
+      .getAllCharacters();
+  } else {
+    // 未所持キャラクターのみを取得
+    google.script.run
+      .withSuccessHandler(handleUnownedCharactersSuccess)
+      .withFailureHandler(handleError)
+      .getUnownedCharacters();
+  }
 }
+
+
 
 // ===== ダッシュボードデータ処理 =====
 function handleDashboardSuccess(data) {
@@ -121,19 +132,32 @@ function updateRecommendations(recommendations) {
   console.log('推奨事項:', recommendations);
 }
 
-// ===== ページネーション付きキャラクターデータ処理 =====
-function handlePaginatedCharactersSuccess(data) {
-  console.log('ページネーションデータ取得成功:', data);
-  
-  filteredCharacters = data.characters;
-  currentPage = data.pagination.currentPage;
-  totalPages = data.pagination.totalPages;
-  
+// ===== キャラクターデータ処理 =====
+function handleAllCharactersSuccess(characters) {
+  console.log('全キャラクターデータ取得成功:', characters.length + '体');
+  allCharacters = characters;
+  applyFilters();
   hideLoading();
-  renderCharacterList();
-  updateCharacterCount(data.pagination.totalCount);
-  updatePaginationControls(data.pagination);
-  updateSortControls(data.sort);
+}
+
+function handleUnownedCharactersSuccess(characters) {
+  console.log('未所持キャラクターデータ取得成功:', characters.length + '体');
+  allCharacters = characters;
+  applyFilters();
+  hideLoading();
+}
+
+function refreshCharacterList() {
+  loadCharacterData();
+}
+
+function updateSectionTitle() {
+  const title = document.getElementById('sectionTitle');
+  if (showOwnedCharacters) {
+    title.textContent = '👥 全キャラクター一覧';
+  } else {
+    title.textContent = '👥 未所持キャラクター一覧';
+  }
 }
 
 function handleError(error) {
@@ -147,6 +171,11 @@ function applyFilters() {
   console.log('フィルター適用:', currentFilters);
   
   filteredCharacters = allCharacters.filter(character => {
+    // 所持ステータスフィルター（showOwnedCharactersがfalseの場合は未所持のみ）
+    if (!showOwnedCharacters && character.owned) {
+      return false;
+    }
+    
     // 検索フィルター
     if (currentFilters.search) {
       const searchTerm = currentFilters.search.toLowerCase();
@@ -193,8 +222,45 @@ function applyFilters() {
     return true;
   });
   
+  // ソート適用
+  applySorting();
+  
   renderCharacterList();
   updateCharacterCount();
+}
+
+function applySorting() {
+  filteredCharacters.sort(function(a, b) {
+    let aValue, bValue;
+    
+    switch (currentSort.sortBy) {
+      case 'priority':
+        aValue = a.priority === null || a.priority === '' ? 0 : Number(a.priority);
+        bValue = b.priority === null || b.priority === '' ? 0 : Number(b.priority);
+        break;
+      case 'name':
+        aValue = a.name;
+        bValue = b.name;
+        break;
+      case 'attribute':
+        aValue = a.attribute;
+        bValue = b.attribute;
+        break;
+      case 'id':
+        aValue = a.id;
+        bValue = b.id;
+        break;
+      default:
+        aValue = a.priority === null || a.priority === '' ? 0 : Number(a.priority);
+        bValue = b.priority === null || b.priority === '' ? 0 : Number(b.priority);
+    }
+    
+    if (currentSort.sortOrder === 'asc') {
+      return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+    } else {
+      return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+    }
+  });
 }
 
 function clearAllFilters() {
@@ -268,9 +334,10 @@ function createCharacterCard(character) {
   const attributeClass = getAttributeClass(character.attribute);
   const priorityDisplay = getPriorityDisplay(character.priority);
   const shopTags = getShopTags(character);
+  const ownedClass = character.owned ? 'owned' : '';
   
   return `
-    <div class="character-card" data-character-id="${character.id}" data-row-index="${character.rowIndex}" onclick="showCharacterDetails('${character.id}')">
+    <div class="character-card ${ownedClass}" data-character-id="${character.id}" data-row-index="${character.rowIndex}" onclick="showCharacterModal('${character.id}')">
       <div class="character-header">
         <div>
           <div class="character-name">${escapeHtml(character.name)}</div>
@@ -448,73 +515,31 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// ===== ページネーション・ソート制御 =====
-function updatePaginationControls(pagination) {
-  const paginationDiv = document.getElementById('paginationControls');
-  const prevBtn = document.getElementById('prevPage');
-  const nextBtn = document.getElementById('nextPage');
-  const pageInfo = document.getElementById('pageInfo');
-  
-  if (pagination.totalPages > 1) {
-    paginationDiv.style.display = 'flex';
-    prevBtn.disabled = !pagination.hasPrev;
-    nextBtn.disabled = !pagination.hasNext;
-    pageInfo.textContent = `${pagination.currentPage} / ${pagination.totalPages}`;
-  } else {
-    paginationDiv.style.display = 'none';
-  }
-}
-
-function updateSortControls(sort) {
-  document.getElementById('sortBy').value = sort.sortBy;
-  document.getElementById('sortOrder').value = sort.sortOrder;
-}
-
-function updateCharacterCount(totalCount) {
-  const count = totalCount || filteredCharacters.length;
+// ===== UI制御 =====
+function updateCharacterCount() {
+  const count = filteredCharacters.length;
   document.getElementById('characterCount').textContent = count + '体';
 }
 
 // ===== イベントリスナー拡張 =====
 function setupExtendedEventListeners() {
-  // ページネーション
-  document.getElementById('prevPage').addEventListener('click', function() {
-    if (currentPage > 1) {
-      currentPage--;
-      loadCharactersWithPagination();
-    }
-  });
-  
-  document.getElementById('nextPage').addEventListener('click', function() {
-    if (currentPage < totalPages) {
-      currentPage++;
-      loadCharactersWithPagination();
-    }
-  });
-  
   // ソート
   document.getElementById('sortBy').addEventListener('change', function(e) {
     currentSort.sortBy = e.target.value;
-    currentPage = 1;
-    loadCharactersWithPagination();
+    applyFilters();
   });
   
   document.getElementById('sortOrder').addEventListener('change', function(e) {
     currentSort.sortOrder = e.target.value;
-    currentPage = 1;
-    loadCharactersWithPagination();
-  });
-  
-  // ページサイズ
-  document.getElementById('pageSize').addEventListener('change', function(e) {
-    pageSize = parseInt(e.target.value);
-    currentPage = 1;
-    loadCharactersWithPagination();
+    applyFilters();
   });
 }
 
 // ===== キャラクター詳細モーダル =====
-function showCharacterDetails(characterId) {
+let currentModalCharacter = null;
+let isUpdatingOwnership = false;
+
+function showCharacterModal(characterId) {
   google.script.run
     .withSuccessHandler(function(details) {
       renderCharacterModal(details);
@@ -528,6 +553,7 @@ function showCharacterDetails(characterId) {
 function renderCharacterModal(details) {
   const character = details.character;
   const similar = details.similarCharacters;
+  currentModalCharacter = character;
   
   const modalHtml = `
     <div class="modal-overlay" id="characterModal" onclick="closeModal(event)">
@@ -536,16 +562,34 @@ function renderCharacterModal(details) {
         
         <div class="character-detail-header">
           <div class="character-detail-name">${escapeHtml(character.name)}</div>
+          <div class="character-detail-id">ID: ${escapeHtml(character.id)}</div>
           <div class="character-attribute ${getAttributeClass(character.attribute)}">
             ${escapeHtml(character.attribute)}
           </div>
         </div>
         
         <div class="character-detail-info">
-          <p><strong>ID:</strong> ${escapeHtml(character.id)}</p>
           <p><strong>HC:</strong> ${escapeHtml(character.hc || 'なし')}</p>
           <p><strong>優先度:</strong> ${character.priority || '未設定'}</p>
           <p><strong>入手方法:</strong> ${getShopInfo(character)}</p>
+        </div>
+        
+        <div class="ownership-controls">
+          <h3>所持ステータス</h3>
+          <div class="ownership-buttons">
+            <button class="ownership-btn owned ${character.owned ? 'active' : ''}" 
+                    onclick="setOwnership('${character.id}', ${character.rowIndex}, true)"
+                    ${isUpdatingOwnership ? 'disabled' : ''}>
+              <span class="icon">✓</span>
+              所持済み
+            </button>
+            <button class="ownership-btn unowned ${!character.owned ? 'active' : ''}" 
+                    onclick="setOwnership('${character.id}', ${character.rowIndex}, false)"
+                    ${isUpdatingOwnership ? 'disabled' : ''}>
+              <span class="icon">✗</span>
+              未所持
+            </button>
+          </div>
         </div>
         
         ${similar.length > 0 ? `
@@ -564,13 +608,106 @@ function renderCharacterModal(details) {
   `;
   
   document.body.insertAdjacentHTML('beforeend', modalHtml);
+  
+  // モーダル表示アニメーション
+  setTimeout(() => {
+    const modal = document.getElementById('characterModal');
+    if (modal) {
+      modal.classList.add('show');
+    }
+  }, 10);
+}
+
+function setOwnership(characterId, rowIndex, isOwned) {
+  if (isUpdatingOwnership) return;
+  
+  // 現在の状態と同じ場合はスキップ
+  if (currentModalCharacter && currentModalCharacter.owned === isOwned) {
+    return;
+  }
+  
+  isUpdatingOwnership = true;
+  
+  // ボタンの状態を更新
+  const buttons = document.querySelectorAll('.ownership-btn');
+  buttons.forEach(btn => {
+    btn.disabled = true;
+    btn.classList.add('loading');
+  });
+  
+  console.log('所持ステータス更新:', characterId, rowIndex, isOwned);
+  
+  google.script.run
+    .withSuccessHandler(function(success) {
+      handleOwnershipUpdateSuccess(characterId, isOwned);
+    })
+    .withFailureHandler(function(error) {
+      handleOwnershipUpdateError(error);
+    })
+    .updateOwnershipStatus(rowIndex, isOwned);
+}
+
+function handleOwnershipUpdateSuccess(characterId, isOwned) {
+  console.log('所持ステータス更新成功:', characterId, isOwned);
+  
+  // ローカルデータを更新
+  if (currentModalCharacter) {
+    currentModalCharacter.owned = isOwned;
+  }
+  
+  // allCharactersとfilteredCharactersも更新
+  updateLocalCharacterData(characterId, isOwned);
+  
+  // モーダルを閉じる
+  closeModal();
+  
+  // 一覧画面を更新
+  refreshCharacterList();
+  
+  isUpdatingOwnership = false;
+}
+
+function handleOwnershipUpdateError(error) {
+  console.error('所持ステータス更新エラー:', error);
+  
+  // ボタンの状態を元に戻す
+  const buttons = document.querySelectorAll('.ownership-btn');
+  buttons.forEach(btn => {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  });
+  
+  alert('所持ステータスの更新に失敗しました: ' + error.message);
+  isUpdatingOwnership = false;
+}
+
+function updateLocalCharacterData(characterId, isOwned) {
+  // allCharactersを更新
+  for (let i = 0; i < allCharacters.length; i++) {
+    if (allCharacters[i].id === characterId) {
+      allCharacters[i].owned = isOwned;
+      break;
+    }
+  }
+  
+  // filteredCharactersを更新
+  for (let i = 0; i < filteredCharacters.length; i++) {
+    if (filteredCharacters[i].id === characterId) {
+      filteredCharacters[i].owned = isOwned;
+      break;
+    }
+  }
 }
 
 function closeModal(event) {
   if (!event || event.target.id === 'characterModal' || event.target.className === 'modal-close') {
     const modal = document.getElementById('characterModal');
     if (modal) {
-      modal.remove();
+      modal.classList.remove('show');
+      setTimeout(() => {
+        modal.remove();
+        currentModalCharacter = null;
+      }, 300);
     }
   }
 }
@@ -596,20 +733,5 @@ document.addEventListener('DOMContentLoaded', function() {
   loadInitialData();
 });
 
-// ===== Google Apps Script関数の呼び出し用ラッパー =====
-function getDashboardData() {
-  return UIController.getDashboardData();
-}
 
-function getCharactersWithPagination(options) {
-  return UIController.getCharactersWithPagination(options);
-}
-
-function getCharacterDetails(characterId) {
-  return UIController.getCharacterDetails(characterId);
-}
-
-function updatePriority(rowIndex, priority) {
-  return SpreadsheetService.updatePriority(rowIndex, priority);
-}
 </script>

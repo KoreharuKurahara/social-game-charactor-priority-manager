@@ -162,7 +162,7 @@ var SpreadsheetService = {
   updatePriority: function(rowIndex, priority) {
     try {
       // 入力値検証
-      if (typeof priority !== 'number' || priority < 1 || priority > 10) {
+      if (priority !== null && (typeof priority !== 'number' || priority < 1 || priority > 10)) {
         throw new Error('優先度は1-10の数値で入力してください');
       }
       
@@ -179,6 +179,58 @@ var SpreadsheetService = {
     } catch (error) {
       Logger.log('優先度更新エラー: ' + error.toString());
       throw new Error('優先度の更新に失敗しました: ' + error.message);
+    }
+  },
+  
+  /**
+   * 指定キャラクターの所持ステータスを更新
+   * @param {number} rowIndex スプレッドシートの行番号
+   * @param {boolean} isOwned 所持ステータス（true: 所持済み, false: 未所持）
+   * @return {boolean} 更新成功フラグ
+   */
+  updateOwnershipStatus: function(rowIndex, isOwned) {
+    try {
+      // 入力値検証
+      if (typeof isOwned !== 'boolean') {
+        throw new Error('所持ステータスはtrue/falseで指定してください');
+      }
+      
+      var sheet = getSpreadsheet().getActiveSheet();
+      var columnIndexes = this.getColumnIndexes();
+      var ownershipColumn = columnIndexes['所持'] + 1; // 1-indexedに変換
+      
+      // 所持ステータスを更新
+      sheet.getRange(rowIndex, ownershipColumn).setValue(isOwned);
+      
+      Logger.log('所持ステータス更新完了: 行' + rowIndex + ' → ' + isOwned);
+      return true;
+      
+    } catch (error) {
+      Logger.log('所持ステータス更新エラー: ' + error.toString());
+      throw new Error('所持ステータスの更新に失敗しました: ' + error.message);
+    }
+  },
+  
+  /**
+   * 指定キャラクターの詳細情報を取得
+   * @param {string} characterId キャラクターID
+   * @return {Object} キャラクター詳細情報
+   */
+  getCharacterById: function(characterId) {
+    try {
+      var allCharacters = this.getAllCharacters();
+      
+      for (var i = 0; i < allCharacters.length; i++) {
+        if (allCharacters[i].id === characterId) {
+          return allCharacters[i];
+        }
+      }
+      
+      throw new Error('キャラクターが見つかりません: ' + characterId);
+      
+    } catch (error) {
+      Logger.log('キャラクター詳細取得エラー: ' + error.toString());
+      throw new Error('キャラクター詳細の取得に失敗しました: ' + error.message);
     }
   }
 };

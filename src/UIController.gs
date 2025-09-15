@@ -382,3 +382,29 @@ function generateDashboardRecommendations(stats, highPriorityChars, unsetPriorit
   
   return recommendations;
 }
+
+/**
+ * 所持ステータス更新（フロントエンドから呼び出し用）
+ * @param {number} rowIndex スプレッドシートの行番号
+ * @param {boolean} isOwned 所持ステータス
+ * @return {boolean} 更新成功フラグ
+ */
+function updateOwnershipStatus(rowIndex, isOwned) {
+  return SpreadsheetService.updateOwnershipStatus(rowIndex, isOwned);
+}
+
+/**
+ * 全キャラクター取得（フロントエンドから呼び出し用）
+ * @return {Array} 全キャラクターの配列
+ */
+function getAllCharacters() {
+  return SpreadsheetService.getAllCharacters();
+}
+
+/**
+ * 未所持キャラクター取得（フロントエンドから呼び出し用）
+ * @return {Array} 未所持キャラクターの配列
+ */
+function getUnownedCharacters() {
+  return SpreadsheetService.getUnownedCharacters();
+}
